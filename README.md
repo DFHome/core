@@ -78,7 +78,7 @@ uvicorn app.main:app --reload
 # frontend (использует pnpm)
 cd frontend
 pnpm install
-pnpm run dev   # http://localhost:1285, проксирует /api на localhost:8000, см. vite.config.ts
+pnpm run dev   # проксирует /api на localhost:8000, см. vite.config.ts
 ```
 
 ## Тесты
