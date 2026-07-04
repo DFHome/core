@@ -7,6 +7,11 @@ services:
       - dfhome-data:/data
     expose:
       - "8000"
+    # No IPv6 inside the container: TrueNAS SCALE gives docker networks ULA
+    # IPv6 addresses without a working outbound route, so any host with an
+    # AAAA record (open-meteo) hangs until timeout instead of using IPv4.
+    sysctls:
+      net.ipv6.conf.all.disable_ipv6: "1"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 10s

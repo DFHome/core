@@ -1061,10 +1061,12 @@ body.kiosk-mode .widgets-panel .remove-btn {
 }
 
 /* A single 390px column overflows the TV vertically, so the kiosk panel
-   doubles in width and lays widgets out in two columns instead. Combined
-   with body overflow:hidden this keeps the page scroll-free. */
+   widens and lays widgets out in two columns instead. Combined with body
+   overflow:hidden this keeps the page scroll-free. 640px ≈ the sidebar +
+   panel width of the normal view, so the plan canvas — and therefore the
+   plan itself — stays the same size as in editing mode. */
 body.kiosk-mode .widgets-panel {
-  width: 700px;
+  width: 640px;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;

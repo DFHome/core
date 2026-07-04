@@ -259,16 +259,12 @@ export default function Plan() {
     Math.max(0, ...layout.rooms.map((r) => r.x + r.width), ...layout.devices.map((d) => d.x + 40)) + FIT_PAD;
   const contentH =
     Math.max(0, ...layout.rooms.map((r) => r.y + r.height), ...layout.devices.map((d) => d.y + 48)) + FIT_PAD;
-  // The plan scales BOTH ways to fill the canvas (capped so markers don't
-  // balloon on huge screens) — same behavior windowed and in kiosk mode, so
-  // the plan looks the same size in both.
+  // Shrink-only fit, anchored top-left: the plan renders 1:1 exactly like
+  // the edit mode whenever it fits, and only scales down on screens smaller
+  // than the layout. No upscaling and no centering — enlarging or shifting
+  // the plan made the kiosk view look different from the editing view.
   const rawFit = Math.min(canvasSize.w / contentW, canvasSize.h / contentH);
-  const fitScale = editing || !hasContent || canvasSize.w === 0 ? 1 : Math.min(2.5, rawFit);
-  // Center the fitted plan in the canvas instead of pinning it top-left.
-  const fitOffsetX =
-    editing || !hasContent || canvasSize.w === 0 ? 0 : Math.max(0, (canvasSize.w - contentW * fitScale) / 2);
-  const fitOffsetY =
-    editing || !hasContent || canvasSize.h === 0 ? 0 : Math.max(0, (canvasSize.h - contentH * fitScale) / 2);
+  const fitScale = editing || !hasContent || canvasSize.w === 0 ? 1 : Math.min(1, rawFit);
 
   return (
     <div className="plan-page">
@@ -402,10 +398,7 @@ export default function Plan() {
           <p className="loading">Загрузка плана…</p>
         ) : (
           <div className="plan-canvas" ref={canvasRef}>
-            <div
-              className="plan-scale"
-              style={{ transform: `translate(${fitOffsetX}px, ${fitOffsetY}px) scale(${fitScale})` }}
-            >
+            <div className="plan-scale" style={{ transform: `scale(${fitScale})` }}>
               {layout.rooms.map((room) => (
                 <RoomBox
                   key={room.room_id}
