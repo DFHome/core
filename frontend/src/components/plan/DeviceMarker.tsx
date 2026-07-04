@@ -51,9 +51,10 @@ export default function DeviceMarker({ device, position, editable, onChange, onR
       }
     : undefined;
 
+  // Every numeric property (battery, humidity, temperature, ...) — not just
+  // the first couple; the pill may grow wider than the marker, that's fine.
   const sensorText = device.properties
     .filter((p) => typeof p.value === "number")
-    .slice(0, 2)
     .map((p) => `${p.value}${p.unit ?? ""}`)
     .join(" · ");
 

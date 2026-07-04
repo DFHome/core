@@ -26,8 +26,6 @@ _LOGGER = logging.getLogger(__name__)
 router = APIRouter(prefix="/weather", tags=["weather"])
 
 WEATHER_TTL_SECONDS = 10 * 60
-# Per-provider ceiling; two providers stay well under nginx's 30s read timeout.
-FETCH_DEADLINE_SECONDS = 8
 
 # city query (lowercased) -> geocoding result
 _geo_cache: dict[str, dict] = {}
@@ -35,7 +33,7 @@ _geo_cache: dict[str, dict] = {}
 _weather_cache: dict[str, tuple[float, dict]] = {}
 
 
-def _client() -> httpx.AsyncClient:
+def _client(timeout: httpx.Timeout | float) -> httpx.AsyncClient:
     # local_address pins sockets to IPv4: Docker/TrueNAS networks often get
     # AAAA records from DNS without a working IPv6 route, and the connect
     # then hangs until timeout. retries=0 on purpose — a retry would push the
@@ -44,7 +42,7 @@ def _client() -> httpx.AsyncClient:
     transport = httpx.AsyncHTTPTransport(local_address="0.0.0.0", retries=0)
     return httpx.AsyncClient(
         transport=transport,
-        timeout=5.0,
+        timeout=timeout,
         headers={"User-Agent": "DFHome/0.1 (personal smart home dashboard)"},
     )
 
@@ -170,18 +168,33 @@ async def _fetch_wttr(client: httpx.AsyncClient, query: str) -> dict:
     }
 
 
+# fetcher, httpx timeout, overall deadline (s). Open-meteo answers fast or
+# not at all; wttr.in is a free community service that can take >10s to
+# render a cold city, so it gets a much longer read budget. Both deadlines
+# together must stay under nginx's 30s proxy_read_timeout.
+_PROVIDERS = {
+    "open-meteo": (_fetch_open_meteo, 5.0, 8),
+    "wttr.in": (_fetch_wttr, httpx.Timeout(15.0, connect=5.0), 18),
+}
+# The provider that answered last time is tried first, so a network where
+# open-meteo is unreachable doesn't pay its connect timeout on every refresh.
+_preferred: str | None = None
+
+
 @router.get("")
 async def get_weather(query: str = Query(..., min_length=1)) -> dict:
+    global _preferred
     key = query.strip().lower()
     cached = _weather_cache.get(key)
     if cached and time.time() - cached[0] < WEATHER_TTL_SECONDS:
         return cached[1]
 
     errors: list[str] = []
-    for name, fetch in (("open-meteo", _fetch_open_meteo), ("wttr.in", _fetch_wttr)):
+    for name in sorted(_PROVIDERS, key=lambda n: n != _preferred):
+        fetch, timeout, deadline = _PROVIDERS[name]
         try:
-            async with asyncio.timeout(FETCH_DEADLINE_SECONDS):
-                async with _client() as client:
+            async with asyncio.timeout(deadline):
+                async with _client(timeout) as client:
                     payload = await fetch(client, query)
         except HTTPException:
             raise  # the provider answered ("city not found") — that's the answer
@@ -190,6 +203,7 @@ async def get_weather(query: str = Query(..., min_length=1)) -> dict:
             errors.append(reason)
             _LOGGER.warning("Weather fetch failed for %r — %s", query, reason)
             continue
+        _preferred = name
         _weather_cache[key] = (time.time(), payload)
         return payload
 
