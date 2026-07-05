@@ -51,6 +51,8 @@
   --warning-soft: rgba(253, 203, 110, 0.18);
   --danger: var(--c-chi-gong);
   --danger-soft: rgba(214, 48, 49, 0.18);
+  --metric-cold: var(--c-electron-blue);
+  --metric-cold-soft: rgba(9, 132, 227, 0.18);
   --info: var(--c-faded-poster);
   --info-soft: rgba(129, 236, 236, 0.14);
 
@@ -100,6 +102,13 @@
   color: var(--danger);
 }
 
+.metric-low .widget-value,
+.metric-low.weather-m-temp,
+.metric-low.sensor-chart-current,
+.metric-low .sensor-chart-current {
+  color: var(--metric-cold);
+}
+
 .metric-good.weather-m-stat {
   color: var(--success);
   font-weight: 600;
@@ -127,6 +136,15 @@
   color: var(--danger);
 }
 
+.metric-low.weather-m-stat {
+  color: var(--metric-cold);
+  font-weight: 600;
+}
+
+.metric-low.weather-m-stat svg {
+  color: var(--metric-cold);
+}
+
 .metric-good .sensor-s-icon,
 .metric-good .sensor-m-icon {
   background: var(--success-soft);
@@ -143,6 +161,12 @@
 .metric-bad .sensor-m-icon {
   background: var(--danger-soft);
   color: var(--danger);
+}
+
+.metric-low .sensor-s-icon,
+.metric-low .sensor-m-icon {
+  background: var(--metric-cold-soft);
+  color: var(--metric-cold);
 }
 
 .weather-m-degree {
@@ -1435,6 +1459,11 @@ body.kiosk-mode .plan-toolbar h2 {
 .plan-room-comfort.comfort-bad {
   color: var(--c-pink-glamour);
   background: var(--danger-soft);
+}
+
+.plan-room-comfort.comfort-low {
+  color: var(--metric-cold);
+  background: var(--metric-cold-soft);
 }
 
 .plan-room-resize-handle {

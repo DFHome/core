@@ -1,15 +1,13 @@
 import type { SensorPropertyVariant } from "../components/icons";
 
-export type MetricStatus = "good" | "ok" | "bad";
+export type MetricStatus = "good" | "ok" | "bad" | "low";
 
-/** 0 = in band, 1 = borderline, 2 = out of range. */
-function bandLevel(v: number, lo: number, hi: number, pad: number): 0 | 1 | 2 {
-  if (v >= lo && v <= hi) return 0;
-  if (v >= lo - pad && v <= hi + pad) return 1;
-  return 2;
-}
-
-const STATUS: MetricStatus[] = ["good", "ok", "bad"];
+const SEVERITY: Record<MetricStatus, number> = {
+  good: 0,
+  low: 1,
+  ok: 1,
+  bad: 2,
+};
 
 export interface MetricNormBand {
   lo: number;
@@ -25,9 +23,23 @@ export function metricNormBand(variant: SensorPropertyVariant): MetricNormBand |
   return null;
 }
 
+/** Temperature: norm green, high red, low blue. */
+function tempStatus(value: number): MetricStatus {
+  if (value >= 20 && value <= 24) return "good";
+  if (value > 24) return "bad";
+  return "low";
+}
+
+/** Humidity: norm green, ±5 from band yellow, beyond red. */
+function humidityStatus(value: number): MetricStatus {
+  if (value >= 40 && value <= 60) return "good";
+  if ((value >= 35 && value < 40) || (value > 60 && value <= 65)) return "ok";
+  return "bad";
+}
+
 export function metricStatus(variant: SensorPropertyVariant, value: number): MetricStatus {
-  if (variant === "temp") return STATUS[bandLevel(value, 20, 24, 2)];
-  if (variant === "humidity") return STATUS[bandLevel(value, 40, 60, 10)];
+  if (variant === "temp") return tempStatus(value);
+  if (variant === "humidity") return humidityStatus(value);
   if (variant === "battery") {
     if (value >= 60) return "good";
     if (value >= 20) return "ok";
@@ -46,19 +58,24 @@ export function metricStatusFromInstance(instance: string, value: number): Metri
 export function metricStatusColor(status: MetricStatus): string {
   if (status === "good") return "var(--success)";
   if (status === "ok") return "var(--warning)";
+  if (status === "low") return "var(--metric-cold)";
   return "var(--danger)";
 }
 
-/** Room comfort bands — same thresholds as metricStatus. */
+function pickWorst(a: MetricStatus, b: MetricStatus): MetricStatus {
+  return SEVERITY[b] > SEVERITY[a] ? b : a;
+}
+
+/** Room comfort — worst sensor status wins. */
 export function roomComfortLevel(temps: number[], hums: number[]): MetricStatus {
-  let worst: 0 | 1 | 2 = 0;
+  let level: MetricStatus = "good";
   if (temps.length) {
     const t = temps.reduce((s, x) => s + x, 0) / temps.length;
-    worst = Math.max(worst, bandLevel(t, 20, 24, 2)) as 0 | 1 | 2;
+    level = pickWorst(level, metricStatus("temp", t));
   }
   if (hums.length) {
     const h = hums.reduce((s, x) => s + x, 0) / hums.length;
-    worst = Math.max(worst, bandLevel(h, 40, 60, 10)) as 0 | 1 | 2;
+    level = pickWorst(level, metricStatus("humidity", h));
   }
-  return STATUS[worst];
+  return level;
 }
