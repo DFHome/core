@@ -2340,21 +2340,21 @@ body.kiosk-mode .plan-toolbar h2 {
 }
 
 .widget-slot.size-s .station-cover {
-  width: 24px;
-  height: 24px;
-  border-radius: 5px;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
   flex-shrink: 0;
 }
 
 .widget-slot.size-s .station-cover-empty svg {
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
 }
 
 .widget-slot.size-s .station-track {
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr);
-  gap: 0 6px;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 0 7px;
   align-items: center;
   min-width: 0;
 }
@@ -2371,12 +2371,12 @@ body.kiosk-mode .plan-toolbar h2 {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 1px;
+  gap: 2px;
   min-width: 0;
 }
 
 .widget-slot.size-s .station-title {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   line-height: 1.2;
   overflow: hidden;
@@ -2385,7 +2385,7 @@ body.kiosk-mode .plan-toolbar h2 {
 }
 
 .widget-slot.size-s .station-idle {
-  font-size: 9px;
+  font-size: 10px;
   color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2394,7 +2394,7 @@ body.kiosk-mode .plan-toolbar h2 {
 }
 
 .widget-slot.size-s .station-artist {
-  font-size: 9px;
+  font-size: 10px;
   color: var(--text-muted);
   margin-top: 0;
   overflow: hidden;
@@ -2437,7 +2437,7 @@ body.kiosk-mode .plan-toolbar h2 {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
 }
 
 .station-m-main {
@@ -2458,25 +2458,25 @@ body.kiosk-mode .plan-toolbar h2 {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 2px;
+  gap: 4px;
 }
 
 .widget-slot.size-m .station-body-m .station-cover {
-  width: 52px;
-  height: 52px;
-  border-radius: 8px;
+  width: 74px;
+  height: 74px;
+  border-radius: 10px;
   flex-shrink: 0;
   box-shadow: none;
 }
 
 .widget-slot.size-m .station-body-m .station-cover-empty svg {
-  width: 18px;
-  height: 18px;
+  width: 28px;
+  height: 28px;
 }
 
 .widget-slot.size-m .station-body-m .station-title {
-  font-size: 12px;
-  line-height: 1.25;
+  font-size: 16px;
+  line-height: 1.2;
   white-space: normal;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -2484,12 +2484,12 @@ body.kiosk-mode .plan-toolbar h2 {
 }
 
 .widget-slot.size-m .station-body-m .station-artist {
-  font-size: 10px;
+  font-size: 13px;
   margin-top: 0;
 }
 
 .widget-slot.size-m .station-body-m .station-idle {
-  font-size: 10px;
+  font-size: 13px;
   color: var(--text-muted);
 }
 
@@ -2510,21 +2510,21 @@ body.kiosk-mode .plan-toolbar h2 {
 }
 
 .widget-slot.size-m .station-progress {
-  height: 3px;
+  height: 5px;
 }
 
 .widget-slot.size-m .station-times {
-  margin-top: 2px;
-  font-size: 8.5px;
+  margin-top: 4px;
+  font-size: 10.5px;
 }
 
 .widget-slot.size-m .station-controls {
   display: none;
 }
 
-/* L — header top, track centered, timeline bottom */
+/* L — широкий: крупная обложка, текст, таймлайн внизу */
 .widget-slot.size-l > .widget-card.station-card {
-  padding: 8px 10px;
+  padding: 10px 12px;
   height: 100%;
   justify-content: flex-start;
 }
@@ -2533,7 +2533,7 @@ body.kiosk-mode .plan-toolbar h2 {
   padding-right: 48px;
   margin-bottom: 0;
   flex-shrink: 0;
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.03em;
 }
 
@@ -2550,13 +2550,14 @@ body.kiosk-mode .plan-toolbar h2 {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 6px;
+  gap: 8px;
 }
 
 .widget-slot.size-l .station-track {
   flex: 1;
   display: flex;
   align-items: center;
+  gap: 16px;
   min-height: 0;
 }
 
@@ -2570,17 +2571,41 @@ body.kiosk-mode .plan-toolbar h2 {
 }
 
 .widget-slot.size-l .station-cover {
-  width: 44px;
-  height: 44px;
-  border-radius: 8px;
+  width: 80px;
+  height: 80px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.widget-slot.size-l .station-cover-empty svg {
+  width: 30px;
+  height: 30px;
+}
+
+.widget-slot.size-l .station-track-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
 }
 
 .widget-slot.size-l .station-title {
-  font-size: 13px;
+  font-size: 18px;
+  line-height: 1.2;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .widget-slot.size-l .station-artist {
-  font-size: 11px;
+  font-size: 14px;
+}
+
+.widget-slot.size-l .station-idle {
+  font-size: 14px;
 }
 
 .widget-slot.size-l .station-ctrl {
@@ -2589,11 +2614,11 @@ body.kiosk-mode .plan-toolbar h2 {
 }
 
 .widget-slot.size-l .station-progress {
-  height: 5px;
+  height: 6px;
 }
 
 .widget-slot.size-l .station-times {
-  font-size: 10.5px;
+  font-size: 11.5px;
   margin-top: 4px;
 }
 
