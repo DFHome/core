@@ -216,7 +216,7 @@ async def set_config_entry(domain: str, data: dict[str, Any]) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Custom store repositories (HACS-style "custom repository")
+# Custom store repositories (user-added git URLs)
 # ---------------------------------------------------------------------------
 
 

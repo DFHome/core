@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     # installs everything from Git via the store index.
     bundled_integrations_dir: str = "available_integrations"
 
-    # Remote curated store index (HACS model). When unreachable, the core falls
+    # Remote curated store index. When unreachable, the core falls
     # back to the bundled app/store_index.json (empty by default).
     store_index_url: str | None = None
 

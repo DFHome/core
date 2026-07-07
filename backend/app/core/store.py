@@ -1,4 +1,4 @@
-"""StoreClient: the DFHome integrations store (HACS model).
+"""StoreClient: the DFHome integrations store.
 
 The curated index (repositories.json) lists only Git repository URLs and refs.
 All catalog metadata (domain, name, version, description, ...) is read from each

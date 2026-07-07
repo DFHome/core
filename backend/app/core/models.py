@@ -152,7 +152,7 @@ class Widget(CamelModel):
 
 
 # ---------------------------------------------------------------------------
-# Store / integrations catalog (HACS model)
+# Store / integrations catalog
 # ---------------------------------------------------------------------------
 
 IntegrationCategory = Literal["protocol", "service", "sensor", "media", "weather"]
