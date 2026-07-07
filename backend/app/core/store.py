@@ -1,17 +1,15 @@
 """StoreClient: the DFHome integrations store (HACS model).
 
-Sources of truth are distributed across Git repositories plus a curated index;
-there is no central server. The client can install an integration from:
-  - a curated index entry (`GET /store` catalog),
-  - a direct Git URL (custom repository),
-  - a local directory (bundled sources / offline).
+The curated index (repositories.json) lists only Git repository URLs and refs.
+All catalog metadata (domain, name, version, description, ...) is read from each
+integration's manifest.json — single source of truth.
 
-It also detects updates (higher SemVer available) and performs safe update and
-fully clean uninstall (see docs and the plan's lifecycle section).
+Install/update/uninstall lifecycle is unchanged; see docs/BACKEND_PLAN.md.
 """
 import asyncio
 import json
 import logging
+import re
 import shutil
 import tempfile
 from pathlib import Path
@@ -27,6 +25,10 @@ from app.core.models import PlanLayout, StoreItem
 _LOGGER = logging.getLogger(__name__)
 
 _BUNDLED_INDEX = Path(__file__).resolve().parent.parent / "store_index.json"
+
+_GITHUB_RE = re.compile(
+    r"^https?://(?:www\.)?github\.com/(?P<owner>[^/]+)/(?P<repo>[^/]+?)(?:\.git)?/?$"
+)
 
 
 def _parse_version(value: str) -> tuple[int, ...]:
@@ -44,6 +46,38 @@ def _parse_version(value: str) -> tuple[int, ...]:
 
 def _is_newer(candidate: str, current: str) -> bool:
     return _parse_version(candidate) > _parse_version(current)
+
+
+def _entry_source_ref(entry: dict[str, Any]) -> tuple[str, str | None]:
+    """Resolve git/local source and ref from a thin or legacy index entry."""
+    source = entry.get("repository") or entry.get("source")
+    if not source:
+        raise IntegrationError("Index entry missing 'repository' (or legacy 'source')")
+    ref = entry.get("ref")
+    return source, ref
+
+
+def _github_raw_manifest_url(repository: str, ref: str | None) -> str:
+    match = _GITHUB_RE.match(repository.rstrip("/"))
+    if not match:
+        raise IntegrationError(f"Not a GitHub repository URL: {repository}")
+    owner = match.group("owner")
+    repo = match.group("repo")
+    branch = ref or "main"
+    return f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/manifest.json"
+
+
+def _validate_manifest_dict(manifest: dict[str, Any]) -> dict[str, Any]:
+    if not manifest.get("domain"):
+        raise IntegrationError("manifest.json missing 'domain'")
+    if not manifest.get("version"):
+        raise IntegrationError("manifest.json missing 'version'")
+    return manifest
+
+
+def _source_priority(source: str) -> int:
+    """Git remotes beat local test fixtures when the same domain appears twice."""
+    return 0 if source.startswith("local:") else 1
 
 
 class StoreClient:
@@ -72,20 +106,94 @@ class StoreClient:
             _LOGGER.warning("Remote store index unavailable, using bundled")
             return []
 
-    async def _index(self) -> dict[str, dict[str, Any]]:
-        entries: dict[str, dict[str, Any]] = {}
+    async def _raw_index(self) -> list[dict[str, Any]]:
+        """Merged index entries: remote overrides bundled entries with same source."""
+        by_source: dict[str, dict[str, Any]] = {}
         for entry in self._bundled_index():
-            entries[entry["domain"]] = entry
+            try:
+                source, _ = _entry_source_ref(entry)
+                by_source[source] = entry
+            except IntegrationError:
+                continue
         for entry in await self._remote_index():
-            entries[entry["domain"]] = entry
-        return entries
+            try:
+                source, _ = _entry_source_ref(entry)
+                by_source[source] = entry
+            except IntegrationError:
+                _LOGGER.warning("Skipping invalid remote index entry: %s", entry)
+        return list(by_source.values())
+
+    def _bundled_source_dir(self, name: str) -> Path:
+        return Path(settings.bundled_integrations_dir).resolve() / name
+
+    def _read_local_manifest(self, local_name: str) -> dict[str, Any]:
+        path = self._bundled_source_dir(local_name) / "manifest.json"
+        if not path.exists():
+            raise IntegrationError(f"manifest.json not found for local:{local_name}")
+        try:
+            manifest = json.loads(path.read_text(encoding="utf-8"))
+        except Exception as exc:  # noqa: BLE001
+            raise IntegrationError(f"Invalid manifest.json for local:{local_name}: {exc}") from exc
+        return _validate_manifest_dict(manifest)
+
+    async def _fetch_remote_manifest(self, repository: str, ref: str | None) -> dict[str, Any]:
+        url = _github_raw_manifest_url(repository, ref)
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(url)
+            resp.raise_for_status()
+            try:
+                manifest = resp.json()
+            except Exception as exc:  # noqa: BLE001
+                raise IntegrationError(f"Invalid manifest.json at {url}: {exc}") from exc
+        return _validate_manifest_dict(manifest)
+
+    async def _manifest_for_entry(self, entry: dict[str, Any]) -> dict[str, Any]:
+        source, ref = _entry_source_ref(entry)
+        if source.startswith("local:"):
+            return self._read_local_manifest(source[len("local:") :])
+        return await self._fetch_remote_manifest(source, ref)
+
+    async def _resolve_index_entry_by_domain(
+        self, domain: str
+    ) -> tuple[str, str | None, dict[str, Any]]:
+        best: tuple[str, str | None, dict[str, Any]] | None = None
+        best_prio = -1
+        for entry in await self._raw_index():
+            try:
+                source, ref = _entry_source_ref(entry)
+                manifest = await self._manifest_for_entry(entry)
+            except Exception:  # noqa: BLE001
+                _LOGGER.debug("Skipping index entry while resolving '%s'", domain, exc_info=True)
+                continue
+            if manifest.get("domain") != domain:
+                continue
+            prio = _source_priority(source)
+            if prio > best_prio:
+                best = (source, ref, manifest)
+                best_prio = prio
+        if best is None:
+            raise IntegrationError(f"No source known for integration '{domain}'")
+        return best
 
     async def catalog(self) -> list[StoreItem]:
-        index = await self._index()
         installed = {i["domain"]: i for i in await storage.list_installed()}
-        items: list[StoreItem] = []
-        for domain, entry in index.items():
-            latest = entry.get("version", "0.0.0")
+        by_domain: dict[str, StoreItem] = {}
+        domain_priority: dict[str, int] = {}
+
+        for entry in await self._raw_index():
+            try:
+                source, ref = _entry_source_ref(entry)
+                manifest = await self._manifest_for_entry(entry)
+            except Exception:  # noqa: BLE001
+                _LOGGER.warning("Could not load manifest for index entry %s", entry, exc_info=True)
+                continue
+
+            domain = manifest["domain"]
+            prio = _source_priority(source)
+            if domain in by_domain and domain_priority.get(domain, 0) >= prio:
+                continue
+
+            latest = manifest["version"]
             if domain in installed:
                 current = installed[domain]["version"]
                 if _is_newer(latest, current):
@@ -100,26 +208,26 @@ class StoreClient:
                 status = "available"
                 latest_version = None
                 version = latest
-            items.append(
-                StoreItem(
-                    domain=domain,
-                    name=entry.get("name", domain),
-                    description=entry.get("description", ""),
-                    category=entry.get("category", "service"),
-                    version=version,
-                    author=entry.get("author", "Community"),
-                    status=status,
-                    protocols=entry.get("protocols", []),
-                    latest_version=latest_version,
-                    source=entry.get("source"),
-                )
+
+            by_domain[domain] = StoreItem(
+                domain=domain,
+                name=manifest.get("name", domain),
+                description=manifest.get("description", ""),
+                category=manifest.get("category", "service"),
+                version=version,
+                author=manifest.get("author", "Community"),
+                status=status,
+                protocols=manifest.get("protocols", []),
+                latest_version=latest_version,
+                source=source,
             )
+            domain_priority[domain] = prio
+
+        items = list(by_domain.values())
+        items.sort(key=lambda item: item.name.lower())
         return items
 
     # -- source resolution ---------------------------------------------------
-
-    def _bundled_source_dir(self, name: str) -> Path:
-        return Path(settings.bundled_integrations_dir).resolve() / name
 
     async def _run(self, *args: str) -> None:
         proc = await asyncio.create_subprocess_exec(
@@ -147,7 +255,6 @@ class StoreClient:
                 raise IntegrationError(f"Local source not found: {src}")
             shutil.copytree(src, dest)
             return
-        # Otherwise treat as a Git URL.
         args = ["git", "clone", "--depth", "1"]
         if ref:
             args += ["--branch", ref]
@@ -163,10 +270,7 @@ class StoreClient:
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         except Exception as exc:  # noqa: BLE001
             raise IntegrationError(f"Invalid manifest.json: {exc}") from exc
-        if not manifest.get("domain"):
-            raise IntegrationError("manifest.json missing 'domain'")
-        if not manifest.get("version"):
-            raise IntegrationError("manifest.json missing 'version'")
+        _validate_manifest_dict(manifest)
         if not (package_dir / "__init__.py").exists():
             raise IntegrationError("integration package missing __init__.py")
         return manifest
@@ -182,11 +286,8 @@ class StoreClient:
     ) -> tuple[str, str | None]:
         if source:
             return source, ref
-        index = await self._index()
-        entry = index.get(domain)
-        if not entry or not entry.get("source"):
-            raise IntegrationError(f"No source known for integration '{domain}'")
-        return entry["source"], ref or entry.get("ref")
+        resolved_source, resolved_ref, _ = await self._resolve_index_entry_by_domain(domain)
+        return resolved_source, ref or resolved_ref
 
     # -- install / update / uninstall ---------------------------------------
 
@@ -258,7 +359,6 @@ class StoreClient:
             )
             await self._manager.load(domain)
         except Exception:
-            # Roll back to the previous version so the system stays functional.
             _LOGGER.exception("Update of '%s' failed, rolling back", domain)
             if target.exists():
                 shutil.rmtree(target, ignore_errors=True)
@@ -275,8 +375,6 @@ class StoreClient:
         if record is None:
             raise IntegrationError(f"'{domain}' is not installed")
 
-        # Collect owned ids BEFORE unload clears the registry, so we can scrub
-        # references from the persisted plan/widgets (fully clean uninstall).
         registry = self._manager._registry  # noqa: SLF001 - internal wiring
         device_ids = registry.device_ids_for_domain(domain)
         room_ids = registry.room_ids_for_domain(domain)

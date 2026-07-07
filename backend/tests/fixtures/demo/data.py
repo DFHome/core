@@ -3,9 +3,6 @@
 This module is the single place where demo content lives. Everything showcased
 in DFHome (devices, rooms, dashboard widgets, a suggested floor plan) is defined
 here, so installing the demo integration lights up the whole app.
-
-Ported from the former frontend mocks (frontend/src/integrations/demo/devices.ts
-and frontend/src/lib/mock.ts).
 """
 from app.core.models import (
     Capability,

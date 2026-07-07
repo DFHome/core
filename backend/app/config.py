@@ -16,12 +16,12 @@ class Settings(BaseSettings):
     # Docker volume in container mode and the working dir in standalone mode.
     data_dir: str = "/data"
 
-    # Directory holding bundled integration sources that can be installed
-    # locally without network access (the "local directory" install source).
+    # Directory for local integration sources (tests / dev only). Production
+    # installs everything from Git via the store index.
     bundled_integrations_dir: str = "available_integrations"
 
     # Remote curated store index (HACS model). When unreachable, the core falls
-    # back to the bundled app/store_index.json.
+    # back to the bundled app/store_index.json (empty by default).
     store_index_url: str | None = None
 
     # CORS origins allowed to call the API directly (frontend dev outside docker).

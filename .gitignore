@@ -1,6 +1,9 @@
 .env
 *.db
 
+# Runtime data (SQLite, installed integrations)
+data/
+
 # Python
 __pycache__/
 *.pyc

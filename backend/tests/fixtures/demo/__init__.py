@@ -6,7 +6,7 @@ commands by echoing the new value back as state, and runs a small telemetry
 simulation loop. unload() stops cleanly (the context cancels the loop).
 
 This is the reference for the "everything demo-able goes into the demo
-integration" rule (see CLAUDE.md).
+integration" rule (see DFHome core docs).
 """
 import asyncio
 import random
@@ -17,7 +17,6 @@ from app.core.models import Device
 
 from .data import build_devices, build_plan, build_rooms, build_widgets
 
-# entity_id -> Device (devices are shared references held in the registry too)
 _devices_by_entity: dict[str, Device] = {}
 _devices_by_id: dict[str, Device] = {}
 

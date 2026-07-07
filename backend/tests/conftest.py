@@ -10,15 +10,19 @@ from app.core.manager import IntegrationManager
 from app.core.registry import DeviceRegistry
 from app.core.store import StoreClient
 
-_BUNDLED = Path(__file__).resolve().parent.parent / "available_integrations"
+_FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
 
 @pytest.fixture(autouse=True)
 def isolated_data_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "data_dir", str(tmp_path))
-    monkeypatch.setattr(settings, "bundled_integrations_dir", str(_BUNDLED))
+    monkeypatch.setattr(settings, "bundled_integrations_dir", str(_FIXTURES))
     monkeypatch.setattr(settings, "store_index_url", None)
-    # Reset the storage init cache so it re-creates the DB in the temp dir.
+    import app.core.store as store_module
+
+    monkeypatch.setattr(
+        store_module, "_BUNDLED_INDEX", _FIXTURES / "store_index.json"
+    )
     monkeypatch.setattr(storage, "_initialized", False)
     yield
 

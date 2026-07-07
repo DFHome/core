@@ -18,8 +18,6 @@ COPY requirements.txt .
 RUN uv pip install --no-cache --system -r requirements.txt
 
 COPY app ./app
-# Bundled integration sources usable as a local install source (see StoreClient).
-COPY available_integrations ./available_integrations
 
 RUN mkdir -p /data
 VOLUME ["/data"]

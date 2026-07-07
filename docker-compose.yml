@@ -1,6 +1,8 @@
 services:
   backend:
     build: ./backend
+    environment:
+      - STORE_INDEX_URL=https://raw.githubusercontent.com/DFHome/store/main/repositories.json
     volumes:
       - dfhome-data:/data
     restart: unless-stopped
