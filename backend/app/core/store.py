@@ -1,10 +1,8 @@
 """StoreClient: the DFHome integrations store.
 
-The curated index (repositories.json) lists only Git repository URLs and refs.
-All catalog metadata (domain, name, version, description, ...) is read from each
-integration's manifest.json — single source of truth.
-
-Install/update/uninstall lifecycle is unchanged; see docs/BACKEND_PLAN.md.
+The curated index (repositories.json) lists only Git repository URLs.
+Catalog metadata (domain, name, version, …) and the install ref come from each
+integration's Git repository: latest SemVer tag, or the default branch if no tags.
 """
 import asyncio
 import json
@@ -30,6 +28,8 @@ _GITHUB_RE = re.compile(
     r"^https?://(?:www\.)?github\.com/(?P<owner>[^/]+)/(?P<repo>[^/]+?)(?:\.git)?/?$"
 )
 
+_SEMVER_TAG_RE = re.compile(r"^refs/tags/(?P<tag>v?\d+\.\d+\.\d+)$")
+
 
 def _parse_version(value: str) -> tuple[int, ...]:
     parts: list[int] = []
@@ -48,13 +48,30 @@ def _is_newer(candidate: str, current: str) -> bool:
     return _parse_version(candidate) > _parse_version(current)
 
 
-def _entry_source_ref(entry: dict[str, Any]) -> tuple[str, str | None]:
-    """Resolve git/local source and ref from a thin or legacy index entry."""
+def _entry_repository(entry: dict[str, Any]) -> str:
+    """Resolve git/local source URL from a thin index entry."""
     source = entry.get("repository") or entry.get("source")
     if not source:
         raise IntegrationError("Index entry missing 'repository' (or legacy 'source')")
-    ref = entry.get("ref")
-    return source, ref
+    return source
+
+
+def _latest_semver_tag_from_ls_remote(output: str) -> str | None:
+    """Pick the highest vX.Y.Z tag from `git ls-remote --tags --refs` output."""
+    found: list[tuple[tuple[int, ...], str]] = []
+    for line in output.splitlines():
+        line = line.strip()
+        if not line or "\t" not in line:
+            continue
+        _commit, ref = line.split("\t", 1)
+        match = _SEMVER_TAG_RE.match(ref)
+        if match:
+            tag = match.group("tag")
+            found.append((_parse_version(tag), tag))
+    if not found:
+        return None
+    found.sort(key=lambda item: item[0])
+    return found[-1][1]
 
 
 def _github_raw_manifest_url(repository: str, ref: str | None) -> str:
@@ -111,13 +128,13 @@ class StoreClient:
         by_source: dict[str, dict[str, Any]] = {}
         for entry in self._bundled_index():
             try:
-                source, _ = _entry_source_ref(entry)
+                source = _entry_repository(entry)
                 by_source[source] = entry
             except IntegrationError:
                 continue
         for entry in await self._remote_index():
             try:
-                source, _ = _entry_source_ref(entry)
+                source = _entry_repository(entry)
                 by_source[source] = entry
             except IntegrationError:
                 _LOGGER.warning("Skipping invalid remote index entry: %s", entry)
@@ -147,21 +164,32 @@ class StoreClient:
                 raise IntegrationError(f"Invalid manifest.json at {url}: {exc}") from exc
         return _validate_manifest_dict(manifest)
 
-    async def _manifest_for_entry(self, entry: dict[str, Any]) -> dict[str, Any]:
-        source, ref = _entry_source_ref(entry)
+    async def _manifest_for_source(self, source: str, ref: str | None) -> dict[str, Any]:
         if source.startswith("local:"):
             return self._read_local_manifest(source[len("local:") :])
         return await self._fetch_remote_manifest(source, ref)
 
+    async def _resolve_latest_ref(self, source: str) -> str | None:
+        """Latest SemVer Git tag, or None to use the default branch."""
+        if source.startswith("local:"):
+            return None
+        if source.startswith("file://") or Path(source).exists():
+            return None
+        output = await self._run_capture(
+            "git", "ls-remote", "--tags", "--refs", source
+        )
+        return _latest_semver_tag_from_ls_remote(output)
+
     async def _resolve_index_entry_by_domain(
         self, domain: str
-    ) -> tuple[str, str | None, dict[str, Any]]:
-        best: tuple[str, str | None, dict[str, Any]] | None = None
+    ) -> tuple[str, dict[str, Any]]:
+        best: tuple[str, dict[str, Any]] | None = None
         best_prio = -1
         for entry in await self._raw_index():
             try:
-                source, ref = _entry_source_ref(entry)
-                manifest = await self._manifest_for_entry(entry)
+                source = _entry_repository(entry)
+                ref = await self._resolve_latest_ref(source)
+                manifest = await self._manifest_for_source(source, ref)
             except Exception:  # noqa: BLE001
                 _LOGGER.debug("Skipping index entry while resolving '%s'", domain, exc_info=True)
                 continue
@@ -169,7 +197,7 @@ class StoreClient:
                 continue
             prio = _source_priority(source)
             if prio > best_prio:
-                best = (source, ref, manifest)
+                best = (source, manifest)
                 best_prio = prio
         if best is None:
             raise IntegrationError(f"No source known for integration '{domain}'")
@@ -182,8 +210,9 @@ class StoreClient:
 
         for entry in await self._raw_index():
             try:
-                source, ref = _entry_source_ref(entry)
-                manifest = await self._manifest_for_entry(entry)
+                source = _entry_repository(entry)
+                ref = await self._resolve_latest_ref(source)
+                manifest = await self._manifest_for_source(source, ref)
             except Exception:  # noqa: BLE001
                 _LOGGER.warning("Could not load manifest for index entry %s", entry, exc_info=True)
                 continue
@@ -230,16 +259,21 @@ class StoreClient:
     # -- source resolution ---------------------------------------------------
 
     async def _run(self, *args: str) -> None:
+        await self._run_capture(*args)
+
+    async def _run_capture(self, *args: str) -> str:
         proc = await asyncio.create_subprocess_exec(
             *args,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
         )
         out, _ = await proc.communicate()
+        text = out.decode(errors="replace")
         if proc.returncode != 0:
             raise IntegrationError(
-                f"Command failed ({' '.join(args)}): {out.decode(errors='replace')}"
+                f"Command failed ({' '.join(args)}): {text}"
             )
+        return text
 
     async def _fetch_to(self, source: str, ref: str | None, dest: Path) -> None:
         """Materialize an integration's source into `dest`."""
@@ -285,9 +319,13 @@ class StoreClient:
         self, domain: str, source: str | None, ref: str | None
     ) -> tuple[str, str | None]:
         if source:
-            return source, ref
-        resolved_source, resolved_ref, _ = await self._resolve_index_entry_by_domain(domain)
-        return resolved_source, ref or resolved_ref
+            resolved_source = source
+        else:
+            resolved_source, _ = await self._resolve_index_entry_by_domain(domain)
+        if ref:
+            return resolved_source, ref
+        resolved_ref = await self._resolve_latest_ref(resolved_source)
+        return resolved_source, resolved_ref
 
     # -- install / update / uninstall ---------------------------------------
 
@@ -361,7 +399,7 @@ class StoreClient:
             source = record.get("source")
             if not source:
                 raise IntegrationError(f"No source recorded for '{domain}'")
-            _, ref = await self._resolve_source_ref(domain, source, record.get("pinned_ref"))
+            _, ref = await self._resolve_source_ref(domain, source, None)
 
             target = self._manager.integrations_dir / domain
             backup = target.with_name(f"{domain}.bak")

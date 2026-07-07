@@ -16,18 +16,24 @@ from app.core.context import IntegrationContext
 from app.core.models import Device
 
 from .data import build_devices, build_plan, build_rooms, build_widgets
+from .scan import DemoScanProvider
 
 _devices_by_entity: dict[str, Device] = {}
 _devices_by_id: dict[str, Device] = {}
+_scan_provider: DemoScanProvider | None = None
 
 
 def _index(devices: list[Device]) -> None:
-    _devices_by_entity.clear()
-    _devices_by_id.clear()
     for device in devices:
         _devices_by_id[device.id] = device
         for entity in device.entities:
             _devices_by_entity[entity.id] = device
+
+
+def _index_device(device: Device) -> None:
+    _devices_by_id[device.id] = device
+    for entity in device.entities:
+        _devices_by_entity[entity.id] = device
 
 
 async def _handle_command(entity_id: str, instance: str, value: Any) -> None:
@@ -72,13 +78,15 @@ _ctx: IntegrationContext = None  # type: ignore[assignment]
 
 
 async def setup(ctx: IntegrationContext) -> None:
-    global _ctx
+    global _ctx, _scan_provider
     _ctx = ctx
 
     for room in build_rooms():
         await ctx.register_room(room)
 
     devices = build_devices()
+    _devices_by_entity.clear()
+    _devices_by_id.clear()
     _index(devices)
     for device in devices:
         await ctx.register_device(device)
@@ -88,9 +96,15 @@ async def setup(ctx: IntegrationContext) -> None:
 
     ctx.set_suggested_plan(build_plan())
     ctx.register_command_handler(_handle_command)
+    _scan_provider = DemoScanProvider(ctx, _index_device)
+    ctx.register_scan_provider(_scan_provider)
     ctx.create_task(_simulate())
 
 
 async def unload(ctx: IntegrationContext) -> None:
+    global _scan_provider
+    if _scan_provider is not None:
+        await _scan_provider.cancel_scan()
+    _scan_provider = None
     _devices_by_entity.clear()
     _devices_by_id.clear()

@@ -122,6 +122,55 @@ export interface PlanLayout {
 }
 
 // ---------------------------------------------------------------------------
+// Радар обнаружения устройств (страница «Устройства»)
+// ---------------------------------------------------------------------------
+
+export interface RadarBlip {
+  id: string;
+  name: string;
+  type: DeviceType;
+  /** 0..1 — расстояние от центра */
+  distance: number;
+  /** 0..360 — угол на радаре */
+  bearing: number;
+}
+
+export type DiscoveredDeviceStatus = "found" | "configuring" | "added";
+
+/** Устройство, найденное при сканировании (до добавления в ядро). */
+export interface DiscoveredDevice {
+  id: string;
+  name: string;
+  type: DeviceType;
+  bearing: number;
+  distance: number;
+  status: DiscoveredDeviceStatus;
+  /** 0..100 — прогресс настройки */
+  progress: number;
+}
+
+export type DeviceScanPhase = "scanning" | "configuring" | "complete";
+
+export type DeviceScanEventKind =
+  | "started"
+  | "tick"
+  | "discovered"
+  | "finished"
+  | "progress"
+  | "added"
+  | "complete"
+  | "cancelled";
+
+export interface ScanWsEvent {
+  kind: DeviceScanEventKind;
+  phase?: DeviceScanPhase | null;
+  remainingSeconds?: number | null;
+  device?: DiscoveredDevice | null;
+  deviceId?: string | null;
+  progress?: number | null;
+}
+
+// ---------------------------------------------------------------------------
 // Виджеты дашборда
 // ---------------------------------------------------------------------------
 

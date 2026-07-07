@@ -25,6 +25,7 @@ def build_rooms() -> list[Room]:
         Room(id="bedroom", name="Спальня", icon="BedDouble"),
         Room(id="kitchen", name="Кухня", icon="CookingPot"),
         Room(id="office", name="Кабинет", icon="Laptop"),
+        Room(id="hall", name="Коридор", icon="DoorOpen"),
     ]
 
 
@@ -211,6 +212,85 @@ def build_devices() -> list[Device]:
             ],
         ),
     ]
+
+
+def build_discoverable_devices() -> dict[str, Device]:
+    """Devices that appear only after a successful radar scan pairing."""
+    return {
+        "demo:light-hall-bulb": Device(
+            id="demo:light-hall-bulb",
+            integration=DOMAIN,
+            name="Лампа коридор",
+            type="light",
+            room_id="hall",
+            online=True,
+            entities=[
+                Entity(
+                    id="demo:light-hall-bulb:main",
+                    name="Лампа коридор",
+                    capabilities=[
+                        Capability(kind="switch", instance="on", label="Питание", value=False),
+                        Capability(
+                            kind="slider",
+                            instance="brightness",
+                            label="Яркость",
+                            value=60,
+                            min=0,
+                            max=100,
+                            step=1,
+                            unit="%",
+                        ),
+                    ],
+                )
+            ],
+        ),
+        "demo:sensor-door": Device(
+            id="demo:sensor-door",
+            integration=DOMAIN,
+            name="Датчик двери",
+            type="sensor",
+            room_id="hall",
+            online=True,
+            entities=[
+                Entity(
+                    id="demo:sensor-door:main",
+                    name="Датчик двери",
+                    properties=[
+                        Property(
+                            kind="motion",
+                            instance="motion",
+                            label="Движение",
+                            value=False,
+                        ),
+                        Property(
+                            kind="battery",
+                            instance="battery",
+                            label="Батарея",
+                            value=91,
+                            unit="%",
+                        ),
+                    ],
+                )
+            ],
+        ),
+        "demo:switch-hall": Device(
+            id="demo:switch-hall",
+            integration=DOMAIN,
+            name="Выключатель",
+            type="switch",
+            room_id="hall",
+            online=True,
+            entities=[
+                Entity(
+                    id="demo:switch-hall:main",
+                    name="Выключатель",
+                    capabilities=[
+                        Capability(kind="switch", instance="on", label="Питание", value=False),
+                    ],
+                )
+            ],
+        ),
+    }
 
 
 def build_widgets() -> list[Widget]:

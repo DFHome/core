@@ -11,6 +11,7 @@ from typing import Any, Awaitable, Callable
 
 from app.core.models import Device, PlanLayout, Room, Widget
 from app.core.registry import DeviceRegistry
+from app.core.scan_protocol import DeviceScanProvider
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -46,6 +47,9 @@ class IntegrationContext:
 
     def register_command_handler(self, handler: CommandHandler) -> None:
         self._registry.register_command_handler(self.domain, handler)
+
+    def register_scan_provider(self, provider: DeviceScanProvider) -> None:
+        self._registry.register_scan_provider(self.domain, provider)
 
     # -- state push ----------------------------------------------------------
 

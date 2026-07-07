@@ -193,6 +193,45 @@ class DeviceCommand(CamelModel):
 
 
 # ---------------------------------------------------------------------------
+# Device discovery / scan (pairing flow)
+# ---------------------------------------------------------------------------
+
+DiscoveredDeviceStatus = Literal["found", "configuring", "added"]
+DeviceScanPhase = Literal["scanning", "configuring", "complete"]
+DeviceScanEventKind = Literal[
+    "started",
+    "tick",
+    "discovered",
+    "finished",
+    "progress",
+    "added",
+    "complete",
+    "cancelled",
+]
+
+
+class DiscoveredDevice(CamelModel):
+    """A device seen during an active scan, before it is registered in the core."""
+
+    id: str
+    name: str
+    type: DeviceType
+    bearing: float
+    distance: float
+    status: DiscoveredDeviceStatus = "found"
+    progress: int = 0
+
+
+class ScanWsEvent(CamelModel):
+    kind: DeviceScanEventKind
+    phase: DeviceScanPhase | None = None
+    remaining_seconds: int | None = None
+    device: DiscoveredDevice | None = None
+    device_id: str | None = None
+    progress: int | None = None
+
+
+# ---------------------------------------------------------------------------
 # WebSocket messages
 # ---------------------------------------------------------------------------
 
@@ -200,8 +239,10 @@ class DeviceCommand(CamelModel):
 class WsMessage(CamelModel):
     """Message pushed to connected clients over the WebSocket."""
 
-    type: Literal["snapshot", "device_state"]
+    type: Literal["snapshot", "device_state", "device_scan"]
     # snapshot
     devices: list[Device] | None = None
     # device_state (a single device's updated full state)
     device: Device | None = None
+    # device_scan (discovery / pairing progress)
+    scan: ScanWsEvent | None = None

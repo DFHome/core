@@ -18,6 +18,7 @@ from app.core.models import (
     Widget,
     WsMessage,
 )
+from app.core.scan_protocol import DeviceScanProvider
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -34,6 +35,7 @@ class DeviceRegistry:
         self._widgets: dict[str, dict[str, Widget]] = {}
         self._command_handlers: dict[str, CommandHandler] = {}
         self._suggested_plans: dict[str, PlanLayout] = {}
+        self._scan_providers: dict[str, DeviceScanProvider] = {}
 
     # -- registration (called by integrations via the context) --------------
 
@@ -43,11 +45,25 @@ class DeviceRegistry:
     def register_room(self, domain: str, room: Room) -> None:
         self._rooms.setdefault(domain, {})[room.id] = room
 
+    def unregister_room(self, domain: str, room_id: str) -> None:
+        rooms = self._rooms.get(domain)
+        if not rooms:
+            return
+        rooms.pop(room_id, None)
+        if not rooms:
+            self._rooms.pop(domain, None)
+
     def register_widget(self, domain: str, widget: Widget) -> None:
         self._widgets.setdefault(domain, {})[widget.id] = widget
 
     def register_command_handler(self, domain: str, handler: CommandHandler) -> None:
         self._command_handlers[domain] = handler
+
+    def register_scan_provider(self, domain: str, provider: DeviceScanProvider) -> None:
+        self._scan_providers[domain] = provider
+
+    def all_scan_providers(self) -> dict[str, DeviceScanProvider]:
+        return dict(self._scan_providers)
 
     def set_suggested_plan(self, domain: str, layout: PlanLayout) -> None:
         self._suggested_plans[domain] = layout
@@ -119,6 +135,7 @@ class DeviceRegistry:
         self._widgets.pop(domain, None)
         self._command_handlers.pop(domain, None)
         self._suggested_plans.pop(domain, None)
+        self._scan_providers.pop(domain, None)
 
     async def broadcast_snapshot(self) -> None:
         await self._ws_manager.broadcast(

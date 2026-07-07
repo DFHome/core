@@ -1,5 +1,4 @@
 import * as React from "react";
-import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Package } from "lucide-react";
 
@@ -11,7 +10,7 @@ import { DevicePlanInspector } from "@/components/plan/DevicePlanInspector";
 import { PlanCanvas } from "@/components/plan/PlanCanvas";
 import { PLAN_HEIGHT, PLAN_WIDTH } from "@/components/plan/plan-utils";
 import { PlanToolbar } from "@/components/plan/PlanToolbar";
-import { buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 
 const EDGE = 24;
 
@@ -38,7 +37,7 @@ function clampDevice(position: PlanDevicePosition): PlanDevicePosition {
 
 export default function Plan() {
   const { devices, updateCapability } = useDevices();
-  const { rooms } = useRooms();
+  const { rooms, createRoom, updateRoom } = useRooms();
   const { layout, setLayout, save, reset, isLoading } = usePlanLayout();
   const [editable, setEditable] = React.useState(false);
   const [selectedDeviceId, setSelectedDeviceId] = React.useState<string | null>(null);
@@ -46,6 +45,9 @@ export default function Plan() {
   const selectedPosition = layout.devices.find(
     (position) => position.deviceId === selectedDeviceId,
   );
+
+  const isPlanEmpty = layout.rooms.length === 0 && layout.devices.length === 0;
+  const hasSuggestedContent = rooms.length > 0 || devices.length > 0;
 
   const availableRooms = rooms.filter(
     (room) => !layout.rooms.some((planRoom) => planRoom.roomId === room.id),
@@ -55,7 +57,7 @@ export default function Plan() {
       !layout.devices.some((position) => position.deviceId === device.id),
   );
 
-  const updateRoom = (updated: PlanRoom) => {
+  const updatePlanRoom = (updated: PlanRoom) => {
     setLayout((current) => ({
       ...current,
       rooms: current.rooms.map((room) =>
@@ -90,6 +92,27 @@ export default function Plan() {
         }),
       ],
     }));
+  };
+
+  const handleCreateRoom = async () => {
+    try {
+      const created = await createRoom({ name: `Комната ${rooms.length + 1}` });
+      addRoom(created.id);
+    } catch {
+      toast.error("Не удалось создать комнату");
+    }
+  };
+
+  const handleRenameRoom = async (roomId: string, name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      return;
+    }
+    try {
+      await updateRoom(roomId, { name: trimmed });
+    } catch {
+      toast.error("Не удалось переименовать комнату");
+    }
   };
 
   const updateDevice = (updated: PlanDevicePosition) => {
@@ -154,7 +177,11 @@ export default function Plan() {
     try {
       await reset();
       setSelectedDeviceId(null);
-      toast.info("План сброшен к раскладке интеграций");
+      toast.info(
+        hasSuggestedContent
+          ? "План сброшен к раскладке интеграций"
+          : "План очищен",
+      );
     } catch {
       toast.error("Не удалось сбросить план");
     }
@@ -164,20 +191,19 @@ export default function Plan() {
     return <p className="text-muted-foreground text-sm">Загрузка плана…</p>;
   }
 
-  if (rooms.length === 0 && devices.length === 0) {
+  if (isPlanEmpty && !editable) {
     return (
       <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
         <Package className="text-muted-foreground size-12" />
         <div className="space-y-1">
           <p className="font-medium">План дома пуст</p>
           <p className="text-muted-foreground max-w-sm text-sm">
-            Установите интеграцию «Демо» из магазина — она добавит комнаты,
-            устройства и готовую раскладку плана.
+            Создайте комнаты и расставьте их на визуальном плане.
           </p>
         </div>
-        <Link to="/store" className={buttonVariants()}>
-          Открыть магазин
-        </Link>
+        <Button type="button" onClick={() => setEditable(true)}>
+          Создать план дома
+        </Button>
       </div>
     );
   }
@@ -196,6 +222,7 @@ export default function Plan() {
           availableDevices={availableDevices}
           onEditableChange={setEditable}
           onAddRoom={addRoom}
+          onCreateRoom={() => void handleCreateRoom()}
           onAddDevice={addDevice}
           onSave={() => void handleSave()}
           onReset={() => void handleReset()}
@@ -210,8 +237,9 @@ export default function Plan() {
           editable={editable}
           selectedDeviceId={selectedDeviceId}
           onSelectDevice={setSelectedDeviceId}
-          onChangeRoom={updateRoom}
+          onChangeRoom={updatePlanRoom}
           onRemoveRoom={removeRoom}
+          onRenameRoom={(roomId, name) => void handleRenameRoom(roomId, name)}
           onChangeDevice={updateDevice}
           onRemoveDevice={removeDevice}
           onMakeStrip={makeStrip}

@@ -14,7 +14,7 @@ async def test_install_demo_from_local_source(core):
 
     assert manager.is_loaded("demo")
     assert registry.get_device("demo:light-living-ceiling") is not None
-    assert len(registry.all_rooms()) == 4
+    assert len(registry.all_rooms()) == 5
     assert len(registry.all_widgets()) == 4
     installed = await storage.list_installed()
     assert installed[0]["domain"] == "demo"
@@ -79,7 +79,7 @@ async def test_update_keeps_config_and_reloads(core):
     assert manager.is_loaded("demo")
     assert await storage.get_config_entry("demo") == {"foo": "bar"}
     installed = await storage.get_installed("demo")
-    assert installed["version"] == "1.0.0"
+    assert installed["version"] == "1.1.0"
 
 
 async def test_update_missing_integration_raises(core):

@@ -66,6 +66,15 @@ async def _ensure_db() -> None:
                 )
                 """
             )
+            await db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS user_rooms (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    icon TEXT
+                )
+                """
+            )
             await db.commit()
         _initialized = True
 
@@ -243,3 +252,64 @@ async def remove_custom_repo(url: str) -> None:
     async with aiosqlite.connect(settings.database_path) as db:
         await db.execute("DELETE FROM custom_repos WHERE url = ?", (url,))
         await db.commit()
+
+
+# ---------------------------------------------------------------------------
+# User-defined rooms (core-owned, persisted across restarts)
+# ---------------------------------------------------------------------------
+
+
+async def list_user_rooms() -> list[dict[str, Any]]:
+    await _ensure_db()
+    async with aiosqlite.connect(settings.database_path) as db:
+        cur = await db.execute("SELECT id, name, icon FROM user_rooms ORDER BY name")
+        rows = await cur.fetchall()
+    return [{"id": row[0], "name": row[1], "icon": row[2]} for row in rows]
+
+
+async def get_user_room(room_id: str) -> dict[str, Any] | None:
+    await _ensure_db()
+    async with aiosqlite.connect(settings.database_path) as db:
+        cur = await db.execute(
+            "SELECT id, name, icon FROM user_rooms WHERE id = ?", (room_id,)
+        )
+        row = await cur.fetchone()
+    if row is None:
+        return None
+    return {"id": row[0], "name": row[1], "icon": row[2]}
+
+
+async def insert_user_room(
+    room_id: str, name: str, icon: str | None = None
+) -> dict[str, Any]:
+    await _ensure_db()
+    async with aiosqlite.connect(settings.database_path) as db:
+        await db.execute(
+            "INSERT INTO user_rooms (id, name, icon) VALUES (?, ?, ?)",
+            (room_id, name, icon),
+        )
+        await db.commit()
+    return {"id": room_id, "name": name, "icon": icon}
+
+
+async def update_user_room(
+    room_id: str, name: str, icon: str | None = None
+) -> dict[str, Any] | None:
+    await _ensure_db()
+    async with aiosqlite.connect(settings.database_path) as db:
+        cur = await db.execute(
+            "UPDATE user_rooms SET name = ?, icon = ? WHERE id = ?",
+            (name, icon, room_id),
+        )
+        await db.commit()
+        if cur.rowcount == 0:
+            return None
+    return {"id": room_id, "name": name, "icon": icon}
+
+
+async def delete_user_room(room_id: str) -> bool:
+    await _ensure_db()
+    async with aiosqlite.connect(settings.database_path) as db:
+        cur = await db.execute("DELETE FROM user_rooms WHERE id = ?", (room_id,))
+        await db.commit()
+        return cur.rowcount > 0

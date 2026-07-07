@@ -1,15 +1,8 @@
-import {
-  CircleDot,
-  Lightbulb,
-  Plug,
-  Radio,
-  Speaker,
-  Thermometer,
-  WifiOff,
-} from "lucide-react";
+import { WifiOff } from "lucide-react";
 
 import { usePlanDrag } from "@/hooks/use-plan-drag";
-import type { Device, DeviceType, PlanDevicePosition } from "@/lib/types";
+import { deviceTypeIcon } from "@/lib/device-icons";
+import type { Device, PlanDevicePosition } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 
 import { isLight, markerGlow, PLAN_GRID } from "./plan-utils";
@@ -25,16 +18,6 @@ type DeviceMarkerProps = {
   onRemove: () => void;
   onSelect: () => void;
   onMakeStrip: () => void;
-};
-
-const icons: Record<DeviceType, React.ComponentType<{ className?: string }>> = {
-  light: Lightbulb,
-  socket: Plug,
-  switch: CircleDot,
-  sensor: Thermometer,
-  thermostat: Thermometer,
-  media_device: Speaker,
-  other: Radio,
 };
 
 function numericProperties(device: Device) {
@@ -57,7 +40,7 @@ export function DeviceMarker({
   onSelect,
   onMakeStrip,
 }: DeviceMarkerProps) {
-  const Icon = icons[device.type];
+  const Icon = deviceTypeIcon[device.type];
   const drag = usePlanDrag(
     editable,
     () => ({ x: position.x, y: position.y }),

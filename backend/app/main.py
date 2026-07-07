@@ -24,7 +24,8 @@ from app.api import (
     widgets,
     ws,
 )
-from app.core.runtime import manager
+from app.core.runtime import manager, registry
+from app.core.user_rooms import load_user_rooms
 
 logging.basicConfig(level=logging.INFO)
 _LOGGER = logging.getLogger(__name__)
@@ -34,6 +35,7 @@ _LOGGER = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     _LOGGER.info("Starting DFHome core, loading installed integrations")
     await manager.load_installed()
+    await load_user_rooms(registry)
     yield
     await manager.unload_all()
 

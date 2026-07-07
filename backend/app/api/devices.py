@@ -1,9 +1,9 @@
-"""Devices API: list devices and route commands to the owning integration."""
+"""Devices API: list devices, route commands and control discovery scans."""
 from fastapi import APIRouter, HTTPException
 
 from app.core.manager import IntegrationError
 from app.core.models import Device, DeviceCommand
-from app.core.runtime import manager, registry
+from app.core.runtime import manager, registry, scan_coordinator
 
 router = APIRouter(prefix="/devices", tags=["devices"])
 
@@ -33,3 +33,15 @@ async def send_command(device_id: str, command: DeviceCommand) -> Device:
     except IntegrationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return registry.get_device(device_id) or device
+
+
+@router.post("/scan/start")
+async def start_device_scan() -> dict[str, bool]:
+    await scan_coordinator.start()
+    return {"ok": True}
+
+
+@router.post("/scan/cancel")
+async def cancel_device_scan() -> dict[str, bool]:
+    await scan_coordinator.cancel()
+    return {"ok": True}

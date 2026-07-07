@@ -42,9 +42,32 @@ export function devicesSummary(devices: Device[]) {
   };
 }
 
+export const UNASSIGNED_ROOM_ID = "__unassigned__";
+
+export function groupDevicesForDisplay(rooms: Room[], devices: Device[]) {
+  const roomIds = new Set(rooms.map((room) => room.id));
+  const grouped = rooms
+    .map((room) => ({
+      room,
+      devices: devices.filter((device) => device.roomId === room.id),
+    }))
+    .filter((entry) => entry.devices.length > 0);
+
+  const unassigned = devices.filter(
+    (device) => !device.roomId || !roomIds.has(device.roomId),
+  );
+
+  if (unassigned.length > 0) {
+    grouped.push({
+      room: { id: UNASSIGNED_ROOM_ID, name: "Без комнаты" },
+      devices: unassigned,
+    });
+  }
+
+  return grouped;
+}
+
+/** @deprecated Use groupDevicesForDisplay */
 export function devicesByRoom(rooms: Room[], devices: Device[]) {
-  return rooms.map((room) => ({
-    room,
-    devices: devices.filter((device) => device.roomId === room.id),
-  }));
+  return groupDevicesForDisplay(rooms, devices);
 }

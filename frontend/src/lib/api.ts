@@ -10,6 +10,7 @@ import type {
   InstallProgress,
   PlanLayout,
   Room,
+  ScanWsEvent,
   StoreItem,
   Widget,
 } from "./types";
@@ -50,9 +51,27 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ entityId, instance, value }),
     }),
+  startDeviceScan: () =>
+    request<{ ok: boolean }>("/devices/scan/start", { method: "POST" }),
+  cancelDeviceScan: () =>
+    request<{ ok: boolean }>("/devices/scan/cancel", { method: "POST" }),
 
   // rooms
   getRooms: () => request<Room[]>("/rooms"),
+  createRoom: (body: { name: string; icon?: string }) =>
+    request<Room>("/rooms", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  updateRoom: (id: string, body: { name: string; icon?: string }) =>
+    request<Room>(`/rooms/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+  deleteRoom: (id: string) =>
+    request<void>(`/rooms/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    }),
 
   // plan
   getPlan: () => request<PlanLayout>("/plan"),
@@ -119,7 +138,8 @@ export const api = {
 /** WS-сообщения от ядра. */
 export type WsMessage =
   | { type: "snapshot"; devices: Device[] }
-  | { type: "device_state"; device: Device };
+  | { type: "device_state"; device: Device }
+  | { type: "device_scan"; scan: ScanWsEvent };
 
 /**
  * Подписка на поток состояний устройств. Возвращает функцию отписки.

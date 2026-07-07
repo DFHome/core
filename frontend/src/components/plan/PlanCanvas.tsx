@@ -17,6 +17,7 @@ type PlanCanvasProps = {
   onSelectDevice: (deviceId: string | null) => void;
   onChangeRoom: (room: PlanRoom) => void;
   onRemoveRoom: (roomId: string) => void;
+  onRenameRoom?: (roomId: string, name: string) => void;
   onChangeDevice: (position: PlanDevicePosition) => void;
   onRemoveDevice: (deviceId: string) => void;
   onMakeStrip: (deviceId: string, roomId: string) => void;
@@ -31,6 +32,7 @@ export function PlanCanvas({
   onSelectDevice,
   onChangeRoom,
   onRemoveRoom,
+  onRenameRoom,
   onChangeDevice,
   onRemoveDevice,
   onMakeStrip,
@@ -96,6 +98,7 @@ export function PlanCanvas({
                 scale={scale}
                 onChange={onChangeRoom}
                 onRemove={() => onRemoveRoom(room.roomId)}
+                onRename={onRenameRoom}
               />
             ))}
 
