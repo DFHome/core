@@ -20,3 +20,4 @@ dist/
 .agents
 CLAUDE.md
 docs/
+.cursor
