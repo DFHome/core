@@ -46,7 +46,10 @@ export function RoomRect({
 
   return (
     <div
-      className="absolute rounded-lg border border-border/70 bg-card/35 shadow-[inset_0_0_0_1px_rgb(255_255_255/0.02)] backdrop-blur-[1px]"
+      className={[
+        "absolute rounded-lg border border-border/70 bg-card/35 shadow-[inset_0_0_0_1px_rgb(255_255_255/0.02)] backdrop-blur-[1px]",
+        editable ? "cursor-grab active:cursor-grabbing" : "",
+      ].join(" ")}
       style={{
         left: room.x,
         top: room.y,

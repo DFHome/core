@@ -43,7 +43,7 @@ export function DeviceStrip({
     >
       <button
         type="button"
-        className="pointer-events-auto absolute -top-3 left-4 flex max-w-48 items-center gap-1 rounded-full border bg-popover px-2 py-1 text-[10px] font-medium text-foreground shadow"
+        className="pointer-events-auto absolute -top-3 left-4 flex max-w-48 cursor-pointer items-center gap-1 rounded-full border bg-popover px-2 py-1 text-[10px] font-medium text-foreground shadow"
         title={device.name}
         onClick={(event) => {
           event.stopPropagation();

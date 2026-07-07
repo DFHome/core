@@ -2,9 +2,9 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from app.core import storage
+from app.core import install_progress, storage
 from app.core.manager import IntegrationError
-from app.core.models import StoreItem
+from app.core.models import InstallProgress, StoreItem
 from app.core.runtime import store_client
 
 router = APIRouter(prefix="/store", tags=["store"])
@@ -27,6 +27,19 @@ class CustomRepoRequest(BaseModel):
 @router.get("", response_model=list[StoreItem])
 async def catalog() -> list[StoreItem]:
     return await store_client.catalog()
+
+
+@router.get("/progress/{domain}", response_model=InstallProgress | None)
+async def install_progress_status(domain: str) -> InstallProgress | None:
+    progress = await install_progress.get(domain)
+    if progress is None:
+        return None
+    return InstallProgress(
+        domain=progress.domain,
+        step=progress.step,
+        percent=progress.percent,
+        status=progress.status,
+    )
 
 
 @router.post("/install")

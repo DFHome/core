@@ -174,6 +174,13 @@ class StoreItem(CamelModel):
     source: str | None = None
 
 
+class InstallProgress(CamelModel):
+    domain: str
+    step: str
+    percent: int
+    status: Literal["running", "done", "error"] = "running"
+
+
 # ---------------------------------------------------------------------------
 # Device commands
 # ---------------------------------------------------------------------------

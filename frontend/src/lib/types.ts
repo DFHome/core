@@ -195,3 +195,12 @@ export interface StoreItem {
   /** Доступная версия при status === "update_available". */
   latestVersion?: string;
 }
+
+export type InstallProgressStatus = "running" | "done" | "error";
+
+export interface InstallProgress {
+  domain: string;
+  step: string;
+  percent: number;
+  status: InstallProgressStatus;
+}

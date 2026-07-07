@@ -127,6 +127,13 @@
   html {
     @apply font-sans;
     }
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+  a[href] {
+    cursor: pointer;
+  }
 }
 
 /* Портал поверх карточек (у них свой stacking context из-за backdrop-filter). */

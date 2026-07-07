@@ -68,7 +68,10 @@ export function DeviceMarker({
 
   return (
     <div
-      className="absolute z-20 flex w-24 -translate-x-1/2 -translate-y-1/2 select-none flex-col items-center gap-1 text-center"
+      className={[
+        "absolute z-20 flex w-24 -translate-x-1/2 -translate-y-1/2 select-none flex-col items-center gap-1 text-center",
+        editable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer",
+      ].join(" ")}
       style={{ left: position.x, top: position.y }}
       {...drag}
       onClick={(event) => {

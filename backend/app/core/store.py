@@ -18,7 +18,7 @@ from typing import Any
 import httpx
 
 from app.config import settings
-from app.core import storage
+from app.core import install_progress, storage
 from app.core.manager import IntegrationError, IntegrationManager
 from app.core.models import PlanLayout, StoreItem
 
@@ -297,78 +297,126 @@ class StoreClient:
         source: str | None = None,
         ref: str | None = None,
     ) -> None:
-        resolved_source, resolved_ref = await self._resolve_source_ref(
-            domain or "", source, ref
-        )
-        with tempfile.TemporaryDirectory() as tmp:
-            staging = Path(tmp) / "pkg"
-            await self._fetch_to(resolved_source, resolved_ref, staging)
-            manifest = self._load_manifest(staging)
-            resolved_domain = manifest["domain"]
-            if domain and domain != resolved_domain:
-                raise IntegrationError(
-                    f"Manifest domain '{resolved_domain}' != requested '{domain}'"
-                )
-            await self._install_requirements(manifest)
-
-            target = self._manager.integrations_dir / resolved_domain
-            if target.exists():
-                raise IntegrationError(f"'{resolved_domain}' already installed")
-            shutil.copytree(staging, target)
-
-        await storage.upsert_installed(
-            domain=resolved_domain,
-            version=manifest["version"],
-            source=resolved_source,
-            pinned_ref=resolved_ref,
-            manifest=manifest,
-        )
-        await self._manager.load(resolved_domain)
-
-    async def update(self, domain: str) -> None:
-        record = await storage.get_installed(domain)
-        if record is None:
-            raise IntegrationError(f"'{domain}' is not installed")
-        source = record.get("source")
-        if not source:
-            raise IntegrationError(f"No source recorded for '{domain}'")
-        _, ref = await self._resolve_source_ref(domain, source, record.get("pinned_ref"))
-
-        target = self._manager.integrations_dir / domain
-        backup = target.with_name(f"{domain}.bak")
-
-        await self._manager.unload(domain)
-        if backup.exists():
-            shutil.rmtree(backup, ignore_errors=True)
-        if target.exists():
-            target.rename(backup)
-
+        progress_key = domain or "__pending__"
+        await install_progress.clear(progress_key)
         try:
+            await install_progress.set_progress(progress_key, "Подготовка…", 5)
+            resolved_source, resolved_ref = await self._resolve_source_ref(
+                domain or "", source, ref
+            )
             with tempfile.TemporaryDirectory() as tmp:
                 staging = Path(tmp) / "pkg"
-                await self._fetch_to(source, ref, staging)
+                await install_progress.set_progress(
+                    progress_key, "Скачивание репозитория…", 25
+                )
+                await self._fetch_to(resolved_source, resolved_ref, staging)
+                await install_progress.set_progress(
+                    progress_key, "Проверка пакета…", 45
+                )
                 manifest = self._load_manifest(staging)
+                resolved_domain = manifest["domain"]
+                if progress_key != resolved_domain:
+                    await install_progress.clear(progress_key)
+                    progress_key = resolved_domain
+                if domain and domain != resolved_domain:
+                    raise IntegrationError(
+                        f"Manifest domain '{resolved_domain}' != requested '{domain}'"
+                    )
+                await install_progress.set_progress(
+                    progress_key, "Установка зависимостей…", 65
+                )
                 await self._install_requirements(manifest)
+
+                target = self._manager.integrations_dir / resolved_domain
+                if target.exists():
+                    raise IntegrationError(f"'{resolved_domain}' already installed")
+                await install_progress.set_progress(
+                    progress_key, "Копирование файлов…", 85
+                )
                 shutil.copytree(staging, target)
+
             await storage.upsert_installed(
-                domain=domain,
+                domain=resolved_domain,
                 version=manifest["version"],
-                source=source,
-                pinned_ref=ref,
+                source=resolved_source,
+                pinned_ref=resolved_ref,
                 manifest=manifest,
             )
-            await self._manager.load(domain)
+            await install_progress.set_progress(
+                progress_key, "Загрузка интеграции…", 95
+            )
+            await self._manager.load(resolved_domain)
+            await install_progress.complete(progress_key)
         except Exception:
-            _LOGGER.exception("Update of '%s' failed, rolling back", domain)
-            if target.exists():
-                shutil.rmtree(target, ignore_errors=True)
-            if backup.exists():
-                backup.rename(target)
-            await self._manager.load(domain)
+            await install_progress.fail(progress_key)
             raise
-        finally:
+
+    async def update(self, domain: str) -> None:
+        await install_progress.clear(domain)
+        try:
+            await install_progress.set_progress(domain, "Подготовка…", 5)
+            record = await storage.get_installed(domain)
+            if record is None:
+                raise IntegrationError(f"'{domain}' is not installed")
+            source = record.get("source")
+            if not source:
+                raise IntegrationError(f"No source recorded for '{domain}'")
+            _, ref = await self._resolve_source_ref(domain, source, record.get("pinned_ref"))
+
+            target = self._manager.integrations_dir / domain
+            backup = target.with_name(f"{domain}.bak")
+
+            await self._manager.unload(domain)
             if backup.exists():
                 shutil.rmtree(backup, ignore_errors=True)
+            if target.exists():
+                target.rename(backup)
+
+            try:
+                with tempfile.TemporaryDirectory() as tmp:
+                    staging = Path(tmp) / "pkg"
+                    await install_progress.set_progress(
+                        domain, "Скачивание репозитория…", 30
+                    )
+                    await self._fetch_to(source, ref, staging)
+                    await install_progress.set_progress(
+                        domain, "Проверка пакета…", 50
+                    )
+                    manifest = self._load_manifest(staging)
+                    await install_progress.set_progress(
+                        domain, "Установка зависимостей…", 70
+                    )
+                    await self._install_requirements(manifest)
+                    await install_progress.set_progress(
+                        domain, "Копирование файлов…", 85
+                    )
+                    shutil.copytree(staging, target)
+                await storage.upsert_installed(
+                    domain=domain,
+                    version=manifest["version"],
+                    source=source,
+                    pinned_ref=ref,
+                    manifest=manifest,
+                )
+                await install_progress.set_progress(
+                    domain, "Загрузка интеграции…", 95
+                )
+                await self._manager.load(domain)
+                await install_progress.complete(domain)
+            except Exception:
+                _LOGGER.exception("Update of '%s' failed, rolling back", domain)
+                if target.exists():
+                    shutil.rmtree(target, ignore_errors=True)
+                if backup.exists():
+                    backup.rename(target)
+                await self._manager.load(domain)
+                raise
+            finally:
+                if backup.exists():
+                    shutil.rmtree(backup, ignore_errors=True)
+        except Exception:
+            await install_progress.fail(domain)
+            raise
 
     async def uninstall(self, domain: str) -> None:
         record = await storage.get_installed(domain)

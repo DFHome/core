@@ -120,8 +120,8 @@ export function ColorControl({
         ref={buttonRef}
         type="button"
         className={cn(
-          "size-8 shrink-0 rounded-md border shadow-sm transition-opacity",
-          disabled && "pointer-events-none opacity-50",
+          "size-8 shrink-0 cursor-pointer rounded-md border shadow-sm transition-opacity",
+          disabled && "pointer-events-none cursor-not-allowed opacity-50",
         )}
         style={{ backgroundColor: hex }}
         disabled={disabled}
@@ -158,7 +158,7 @@ export function ColorControl({
                   title={preset.label}
                   aria-label={preset.label}
                   className={cn(
-                    "aspect-square w-full rounded-md border shadow-sm transition-transform hover:scale-105",
+                    "aspect-square w-full cursor-pointer rounded-md border shadow-sm transition-transform hover:scale-105",
                     hex.toLowerCase() === preset.hex && "ring-2 ring-ring ring-offset-1 ring-offset-popover",
                   )}
                   style={{ backgroundColor: preset.hex }}

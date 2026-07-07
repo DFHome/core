@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
   Check,
   Download,
@@ -13,7 +13,8 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
-import type { IntegrationCategory, StoreItem } from "@/lib/types"
+import type { InstallProgress, IntegrationCategory, StoreItem } from "@/lib/types"
+import { api } from "@/lib/api"
 import { useStore } from "@/hooks/use-store"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -25,6 +26,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress"
 
 const categoryLabel: Record<IntegrationCategory, string> = {
   protocol: "Протокол",
@@ -45,18 +47,42 @@ const protocolIcon: Record<
   wifi: Gauge,
 }
 
+function InstallProgressBar({ progress }: { progress: InstallProgress | null }) {
+  if (!progress) {
+    return (
+      <div className="w-full space-y-1.5">
+        <Progress value={null} />
+        <p className="text-muted-foreground text-xs">Подготовка…</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="w-full space-y-1.5">
+      <Progress value={progress.percent}>
+        <ProgressLabel className="text-muted-foreground text-xs font-normal">
+          {progress.step}
+        </ProgressLabel>
+        <ProgressValue />
+      </Progress>
+    </div>
+  )
+}
+
 function StoreCard({
   item,
   onInstall,
   onUpdate,
   onUninstall,
   busy,
+  progress,
 }: {
   item: StoreItem
   onInstall: (domain: string) => Promise<void>
   onUpdate: (domain: string) => Promise<void>
   onUninstall: (domain: string) => Promise<void>
   busy: string | null
+  progress: InstallProgress | null
 }) {
   const Icon = protocolIcon[item.protocols[0]] ?? Network
   const isBusy = busy === item.domain
@@ -118,6 +144,9 @@ function StoreCard({
         </div>
       </CardContent>
       <CardFooter className="flex flex-col gap-2">
+        {isBusy && item.status !== "installed" && (
+          <InstallProgressBar progress={progress} />
+        )}
         {item.status === "installed" ? (
           <>
             <Button variant="outline" className="w-full" disabled>
@@ -175,6 +204,8 @@ function StoreCard({
 export default function Store() {
   const [query, setQuery] = useState("")
   const [busy, setBusy] = useState<string | null>(null)
+  const [progress, setProgress] = useState<InstallProgress | null>(null)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const { items, isLoading, install, update, uninstall } = useStore()
 
   const filtered = items.filter(
@@ -183,12 +214,47 @@ export default function Store() {
       i.description.toLowerCase().includes(query.toLowerCase()),
   )
 
-  const wrap =
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current)
+    }
+  }, [])
+
+  const startProgressPolling = (domain: string) => {
+    if (pollRef.current) clearInterval(pollRef.current)
+    setProgress(null)
+
+    const poll = async () => {
+      try {
+        const next = await api.getInstallProgress(domain)
+        if (next) setProgress(next)
+      } catch {
+        // ignore transient polling errors
+      }
+    }
+
+    void poll()
+    pollRef.current = setInterval(() => {
+      void poll()
+    }, 300)
+  }
+
+  const stopProgressPolling = () => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current)
+      pollRef.current = null
+    }
+    setProgress(null)
+  }
+
+  const wrapWithProgress =
     (fn: (domain: string) => Promise<void>) => async (domain: string) => {
       setBusy(domain)
+      startProgressPolling(domain)
       try {
         await fn(domain)
       } finally {
+        stopProgressPolling()
         setBusy(null)
       }
     }
@@ -216,9 +282,17 @@ export default function Store() {
             key={item.domain}
             item={item}
             busy={busy}
-            onInstall={wrap(install)}
-            onUpdate={wrap(update)}
-            onUninstall={wrap(uninstall)}
+            progress={busy === item.domain ? progress : null}
+            onInstall={wrapWithProgress(install)}
+            onUpdate={wrapWithProgress(update)}
+            onUninstall={async (domain) => {
+              setBusy(domain)
+              try {
+                await uninstall(domain)
+              } finally {
+                setBusy(null)
+              }
+            }}
           />
         ))}
       </div>

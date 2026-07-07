@@ -7,6 +7,7 @@
  */
 import type {
   Device,
+  InstallProgress,
   PlanLayout,
   Room,
   StoreItem,
@@ -70,6 +71,10 @@ export const api = {
 
   // store
   getStore: () => request<StoreItem[]>("/store"),
+  getInstallProgress: (domain: string) =>
+    request<InstallProgress | null>(
+      `/store/progress/${encodeURIComponent(domain)}`,
+    ),
   install: (domain: string) =>
     request<{ status: string }>("/store/install", {
       method: "POST",
