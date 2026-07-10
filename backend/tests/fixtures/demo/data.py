@@ -13,7 +13,6 @@ from app.core.models import (
     PlanRoom,
     Property,
     Room,
-    Widget,
 )
 
 DOMAIN = "demo"
@@ -291,37 +290,6 @@ def build_discoverable_devices() -> dict[str, Device]:
             ],
         ),
     }
-
-
-def build_widgets() -> list[Widget]:
-    return [
-        Widget(
-            kind="weather",
-            id="w-weather",
-            title="Погода",
-            location="Москва",
-            temperature=12,
-            condition="Облачно",
-            humidity=68,
-            wind_speed=4,
-        ),
-        Widget(kind="devices_summary", id="w-summary", title="Устройства"),
-        Widget(
-            kind="sensor",
-            id="w-climate",
-            title="Климат в спальне",
-            device_id="demo:sensor-bedroom-climate",
-        ),
-        Widget(
-            kind="media",
-            id="w-media",
-            title="Сейчас играет",
-            device_id="demo:media-office-speaker",
-            track="Nightcall",
-            artist="Kavinsky",
-            playing=True,
-        ),
-    ]
 
 
 def build_plan() -> PlanLayout:

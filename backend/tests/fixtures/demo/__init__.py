@@ -15,7 +15,7 @@ from typing import Any
 from app.core.context import IntegrationContext
 from app.core.models import Device
 
-from .data import build_devices, build_plan, build_rooms, build_widgets
+from .data import build_devices, build_plan, build_rooms
 from .scan import DemoScanProvider
 
 _devices_by_entity: dict[str, Device] = {}
@@ -90,9 +90,6 @@ async def setup(ctx: IntegrationContext) -> None:
     _index(devices)
     for device in devices:
         await ctx.register_device(device)
-
-    for widget in build_widgets():
-        await ctx.register_widget(widget)
 
     ctx.set_suggested_plan(build_plan())
     ctx.register_command_handler(_handle_command)

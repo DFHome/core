@@ -1,5 +1,9 @@
 {
-  "integrations": [
-    { "repository": "local:demo" }
+  "packages": [
+    { "repository": "local:demo" },
+    { "repository": "local:widget_metric" },
+    { "repository": "local:widget_chart" },
+    { "repository": "local:widget_weather" },
+    { "repository": "local:widget_yandex_station" }
   ]
 }

@@ -1,0 +1,14 @@
+{
+  "domain": "widget_weather",
+  "package_type": "widget",
+  "name": "Погода",
+  "version": "1.0.0",
+  "description": "Виджет дашборда: погода по городу (Open-Meteo / wttr.in).",
+  "author": "DFHome",
+  "category": "weather",
+  "iot_class": "local_polling",
+  "protocols": [],
+  "requirements": ["httpx"],
+  "dependencies": [],
+  "config_schema": {}
+}

@@ -10,6 +10,8 @@ clients via the WsManager.
 import logging
 from typing import Awaitable, Callable
 
+from fastapi import APIRouter
+
 from app.core.events import EventBus, WsManager
 from app.core.models import (
     Device,
@@ -36,6 +38,7 @@ class DeviceRegistry:
         self._command_handlers: dict[str, CommandHandler] = {}
         self._suggested_plans: dict[str, PlanLayout] = {}
         self._scan_providers: dict[str, DeviceScanProvider] = {}
+        self._integration_routers: dict[str, tuple[APIRouter, str]] = {}
 
     # -- registration (called by integrations via the context) --------------
 
@@ -61,6 +64,14 @@ class DeviceRegistry:
 
     def register_scan_provider(self, domain: str, provider: DeviceScanProvider) -> None:
         self._scan_providers[domain] = provider
+
+    def register_integration_router(
+        self, domain: str, router: APIRouter, prefix: str = ""
+    ) -> None:
+        self._integration_routers[domain] = (router, prefix)
+
+    def integration_routers(self) -> dict[str, tuple[APIRouter, str]]:
+        return dict(self._integration_routers)
 
     def all_scan_providers(self) -> dict[str, DeviceScanProvider]:
         return dict(self._scan_providers)
@@ -143,6 +154,7 @@ class DeviceRegistry:
         self._command_handlers.pop(domain, None)
         self._suggested_plans.pop(domain, None)
         self._scan_providers.pop(domain, None)
+        self._integration_routers.pop(domain, None)
 
     async def broadcast_snapshot(self) -> None:
         await self._ws_manager.broadcast(

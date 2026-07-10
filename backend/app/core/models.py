@@ -124,31 +124,49 @@ class PlanLayout(CamelModel):
 
 
 # ---------------------------------------------------------------------------
-# Dashboard widgets (contributed by integrations)
+# Dashboard widgets
 # ---------------------------------------------------------------------------
 
-WidgetKind = Literal["weather", "sensor", "media", "devices_summary"]
+WidgetSize = Literal["s", "m", "l"]
+
+WidgetKind = Literal[
+    "plan",
+    "devices_summary",
+    "room_sensor",
+    "sensor_chart",
+    "weather",
+    "station",
+]
 
 
 class Widget(CamelModel):
-    """A dashboard widget. Kept as an open shape so integrations can contribute
-    any of the known widget kinds; the frontend renders by `kind`."""
+    """Dashboard widget instance or catalog template."""
 
     kind: WidgetKind
     id: str
     title: str
-    # weather
-    location: str | None = None
-    temperature: float | None = None
-    condition: str | None = None
-    humidity: float | None = None
-    wind_speed: float | None = None
-    # sensor / media
+    # layout
+    size: WidgetSize | None = None
+    grid_row: int | None = None
+    grid_col: int | None = None
+    source_domain: str | None = None
+    # room_sensor / sensor_chart / station
     device_id: str | None = None
-    # media
-    track: str | None = None
-    artist: str | None = None
-    playing: bool | None = None
+    device_name: str | None = None
+    property_instance: str | None = None
+    label: str | None = None
+    unit: str | None = None
+    # weather
+    query: str | None = None
+
+
+class WidgetCatalogItem(CamelModel):
+    """Available widget template for the dashboard picker."""
+
+    kind: WidgetKind
+    source_domain: str
+    title: str
+    description: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -156,6 +174,7 @@ class Widget(CamelModel):
 # ---------------------------------------------------------------------------
 
 IntegrationCategory = Literal["protocol", "service", "sensor", "media", "weather"]
+StorePackageType = Literal["integration", "widget"]
 StoreItemStatus = Literal["installed", "available", "update_available"]
 
 
@@ -166,6 +185,7 @@ class StoreItem(CamelModel):
     category: IntegrationCategory
     version: str
     author: str
+    package_type: StorePackageType = "integration"
     status: StoreItemStatus = "available"
     protocols: list[str] = []
     # Present when an update is available for an installed integration.

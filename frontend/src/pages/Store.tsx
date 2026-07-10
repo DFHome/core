@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"
+import { useSearchParams } from "react-router-dom"
 import {
   Check,
   Download,
@@ -13,7 +14,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
-import type { InstallProgress, IntegrationCategory, StoreItem } from "@/lib/types"
+import type { InstallProgress, IntegrationCategory, StoreItem, StorePackageType } from "@/lib/types"
 import { api } from "@/lib/api"
 import { useStore } from "@/hooks/use-store"
 import { Badge } from "@/components/ui/badge"
@@ -27,6 +28,14 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+
+const packageTypeLabel: Record<StorePackageType, string> = {
+  integration: "Интеграция",
+  widget: "Виджет",
+}
+
+type StoreTab = "all" | "integrations" | "widgets"
 
 const categoryLabel: Record<IntegrationCategory, string> = {
   protocol: "Протокол",
@@ -134,6 +143,9 @@ function StoreCard({
         <p className="text-muted-foreground text-sm">{item.description}</p>
         <div className="flex flex-wrap gap-1.5">
           <Badge variant="secondary" className="font-normal">
+            {packageTypeLabel[item.packageType]}
+          </Badge>
+          <Badge variant="outline" className="font-normal">
             {categoryLabel[item.category]}
           </Badge>
           {item.protocols.map((p) => (
@@ -193,7 +205,7 @@ function StoreCard({
             ) : (
               <Download className="size-4" />
             )}
-            Установить
+            Установить{item.packageType === "widget" ? " виджет" : ""}
           </Button>
         )}
       </CardFooter>
@@ -202,17 +214,24 @@ function StoreCard({
 }
 
 export default function Store() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tab = (searchParams.get("tab") as StoreTab | null) ?? "all"
   const [query, setQuery] = useState("")
   const [busy, setBusy] = useState<string | null>(null)
   const [progress, setProgress] = useState<InstallProgress | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const { items, isLoading, install, update, uninstall } = useStore()
 
-  const filtered = items.filter(
-    (i) =>
-      i.name.toLowerCase().includes(query.toLowerCase()) ||
-      i.description.toLowerCase().includes(query.toLowerCase()),
-  )
+  const filtered = items.filter((item) => {
+    const matchesQuery =
+      item.name.toLowerCase().includes(query.toLowerCase()) ||
+      item.description.toLowerCase().includes(query.toLowerCase())
+    const matchesTab =
+      tab === "all" ||
+      (tab === "integrations" && item.packageType === "integration") ||
+      (tab === "widgets" && item.packageType === "widget")
+    return matchesQuery && matchesTab
+  })
 
   useEffect(() => {
     return () => {
@@ -266,37 +285,49 @@ export default function Store() {
   return (
     <div className="space-y-4">
       <p className="text-muted-foreground text-sm">
-        Каталог интеграций: протокол-адаптеры и сервисы из Git-репозиториев.
+        Каталог пакетов: интеграции устройств и виджеты дашборда из Git-репозиториев.
       </p>
-      <Input
-        placeholder="Поиск интеграций…"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        className="max-w-sm"
-      />
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {filtered.map((item) => (
-          <StoreCard
-            key={item.domain}
-            item={item}
-            busy={busy}
-            progress={busy === item.domain ? progress : null}
-            onInstall={wrapWithProgress(install)}
-            onUpdate={wrapWithProgress(update)}
-            onUninstall={async (domain) => {
-              setBusy(domain)
-              try {
-                await uninstall(domain)
-              } finally {
-                setBusy(null)
-              }
-            }}
+      <Tabs
+        value={tab}
+        onValueChange={(value) => setSearchParams({ tab: value })}
+      >
+        <TabsList>
+          <TabsTrigger value="all">Всё</TabsTrigger>
+          <TabsTrigger value="integrations">Интеграции</TabsTrigger>
+          <TabsTrigger value="widgets">Виджеты</TabsTrigger>
+        </TabsList>
+        <TabsContent value={tab} className="space-y-4">
+          <Input
+            placeholder="Поиск…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="max-w-sm"
           />
-        ))}
-      </div>
-      {filtered.length === 0 && (
-        <p className="text-muted-foreground text-sm">Ничего не найдено</p>
-      )}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {filtered.map((item) => (
+              <StoreCard
+                key={item.domain}
+                item={item}
+                busy={busy}
+                progress={busy === item.domain ? progress : null}
+                onInstall={wrapWithProgress(install)}
+                onUpdate={wrapWithProgress(update)}
+                onUninstall={async (domain) => {
+                  setBusy(domain)
+                  try {
+                    await uninstall(domain)
+                  } finally {
+                    setBusy(null)
+                  }
+                }}
+              />
+            ))}
+          </div>
+          {filtered.length === 0 && (
+            <p className="text-muted-foreground text-sm">Ничего не найдено</p>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

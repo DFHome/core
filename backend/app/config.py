@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     # back to the bundled app/store_index.json (empty by default).
     store_index_url: str | None = None
 
+    # Optional HTTP proxy for weather providers (Open-Meteo).
+    weather_proxy: str | None = None
+
     # CORS origins allowed to call the API directly (frontend dev outside docker).
     cors_origins: list[str] = [
         "http://localhost:5173",

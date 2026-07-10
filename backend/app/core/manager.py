@@ -11,6 +11,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from fastapi import APIRouter, FastAPI
+
 from app.config import settings
 from app.core import storage
 from app.core.context import IntegrationContext
@@ -29,6 +31,25 @@ class IntegrationManager:
         self._contexts: dict[str, IntegrationContext] = {}
         self._modules: dict[str, Any] = {}
         self._lock = asyncio.Lock()
+        self._app: FastAPI | None = None
+        self._integrations_router: APIRouter | None = None
+        self._mounted_domains: set[str] = set()
+
+    def attach_app(self, app: FastAPI, integrations_router: APIRouter) -> None:
+        self._app = app
+        self._integrations_router = integrations_router
+
+    def _mount_domain_routes(self, domain: str) -> None:
+        if self._integrations_router is None:
+            return
+        if domain in self._mounted_domains:
+            return
+        entry = self._registry.integration_routers().get(domain)
+        if entry is None:
+            return
+        router, prefix = entry
+        self._integrations_router.include_router(router, prefix=f"/{domain}{prefix}")
+        self._mounted_domains.add(domain)
 
     @property
     def integrations_dir(self) -> Path:
@@ -86,6 +107,7 @@ class IntegrationManager:
 
         self._contexts[domain] = context
         self._modules[domain] = module
+        self._mount_domain_routes(domain)
         _LOGGER.info("Loaded integration '%s'", domain)
         await self._registry.broadcast_snapshot()
 
@@ -107,6 +129,7 @@ class IntegrationManager:
         self._registry.clear_domain(domain)
         self._contexts.pop(domain, None)
         self._modules.pop(domain, None)
+        self._mounted_domains.discard(domain)
         self._purge_module_cache(domain)
         _LOGGER.info("Unloaded integration '%s'", domain)
         await self._registry.broadcast_snapshot()

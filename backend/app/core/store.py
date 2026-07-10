@@ -106,7 +106,8 @@ class StoreClient:
     def _bundled_index(self) -> list[dict[str, Any]]:
         try:
             data = json.loads(_BUNDLED_INDEX.read_text(encoding="utf-8"))
-            return data.get("integrations", [])
+            entries = data.get("packages") or data.get("integrations") or []
+            return entries
         except Exception:  # noqa: BLE001
             _LOGGER.exception("Failed to read bundled store index")
             return []
@@ -118,7 +119,8 @@ class StoreClient:
             async with httpx.AsyncClient(timeout=10) as client:
                 resp = await client.get(settings.store_index_url)
                 resp.raise_for_status()
-                return resp.json().get("integrations", [])
+                data = resp.json()
+                return data.get("packages") or data.get("integrations") or []
         except Exception:  # noqa: BLE001 - remote index is best-effort
             _LOGGER.warning("Remote store index unavailable, using bundled")
             return []
@@ -245,6 +247,7 @@ class StoreClient:
                 category=manifest.get("category", "service"),
                 version=version,
                 author=manifest.get("author", "Community"),
+                package_type=manifest.get("package_type", "integration"),
                 status=status,
                 protocols=manifest.get("protocols", []),
                 latest_version=latest_version,

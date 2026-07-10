@@ -7,12 +7,15 @@
  */
 import type {
   Device,
+  DeviceHistory,
   InstallProgress,
   PlanLayout,
   Room,
   ScanWsEvent,
   StoreItem,
+  WeatherData,
   Widget,
+  WidgetCatalogItem,
 } from "./types";
 
 const BASE = "/api";
@@ -87,6 +90,26 @@ export const api = {
 
   // widgets
   getWidgets: () => request<Widget[]>("/widgets"),
+  saveWidgets: (widgets: Widget[]) =>
+    request<Widget[]>("/widgets", {
+      method: "PUT",
+      body: JSON.stringify(widgets),
+    }),
+  resetWidgets: () =>
+    request<Widget[]>("/widgets", {
+      method: "DELETE",
+    }),
+  getWidgetCatalog: () => request<WidgetCatalogItem[]>("/widgets/catalog"),
+
+  getWeather: (query: string) =>
+    request<WeatherData>(
+      `/integrations/widget_weather/weather?query=${encodeURIComponent(query)}`,
+    ),
+
+  getDeviceHistory: (deviceId: string, hours: number) =>
+    request<DeviceHistory>(
+      `/history/${encodeURIComponent(deviceId)}?hours=${hours}`,
+    ),
 
   // store
   getStore: () => request<StoreItem[]>("/store"),

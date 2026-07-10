@@ -174,53 +174,108 @@ export interface ScanWsEvent {
 // Виджеты дашборда
 // ---------------------------------------------------------------------------
 
-export type WidgetKind = "weather" | "sensor" | "media" | "devices_summary";
+export type WidgetSize = "s" | "m" | "l";
 
-export interface WeatherWidget {
-  kind: "weather";
+export type WidgetKind =
+  | "plan"
+  | "devices_summary"
+  | "room_sensor"
+  | "sensor_chart"
+  | "weather"
+  | "station";
+
+export interface WidgetBase {
   id: string;
   title: string;
-  location: string;
-  temperature: number;
-  condition: string;
-  humidity: number;
-  windSpeed: number;
+  size?: WidgetSize;
+  gridRow?: number;
+  gridCol?: number;
+  sourceDomain?: string;
 }
 
-export interface SensorWidget {
-  kind: "sensor";
-  id: string;
-  title: string;
-  /** Id устройства, свойства которого отображает виджет. */
-  deviceId: string;
+export interface PlanWidget extends WidgetBase {
+  kind: "plan";
 }
 
-export interface MediaWidget {
-  kind: "media";
-  id: string;
-  title: string;
-  deviceId: string;
-  track: string;
-  artist: string;
-  playing: boolean;
-}
-
-export interface DevicesSummaryWidget {
+export interface DevicesSummaryWidget extends WidgetBase {
   kind: "devices_summary";
-  id: string;
-  title: string;
-  /** total/online/active вычисляются живьём через useDevices. */
+}
+
+export interface RoomSensorWidget extends WidgetBase {
+  kind: "room_sensor";
+  deviceId: string;
+  deviceName: string;
+  propertyInstance: string;
+  label: string;
+}
+
+export interface SensorChartWidget extends WidgetBase {
+  kind: "sensor_chart";
+  deviceId: string;
+  deviceName: string;
+  propertyInstance: string;
+  label: string;
+  unit?: string | null;
+}
+
+export interface WeatherWidget extends WidgetBase {
+  kind: "weather";
+  query: string;
+}
+
+export interface StationWidget extends WidgetBase {
+  kind: "station";
+  deviceId?: string;
+  deviceName?: string;
 }
 
 export type Widget =
+  | PlanWidget
+  | DevicesSummaryWidget
+  | RoomSensorWidget
+  | SensorChartWidget
   | WeatherWidget
-  | SensorWidget
-  | MediaWidget
-  | DevicesSummaryWidget;
+  | StationWidget;
+
+export interface WidgetCatalogItem {
+  kind: WidgetKind;
+  sourceDomain: string;
+  title: string;
+  description?: string | null;
+}
+
+export interface WeatherData {
+  city: string;
+  lat: number;
+  lon: number;
+  temperature: number | null;
+  humidity: number | null;
+  windSpeed: number | null;
+  weatherCode: number | null;
+  precipitation: number | null;
+  hourly: Array<{
+    time: string;
+    precipitationProbability: number | null;
+    precipitation: number | null;
+    weatherCode: number | null;
+  }>;
+}
+
+export interface HistoryPoint {
+  ts: number;
+  value: number;
+}
+
+export interface DeviceHistory {
+  series: Record<string, HistoryPoint[]>;
+  latest: Record<string, HistoryPoint>;
+}
 
 // ---------------------------------------------------------------------------
-// Магазин интеграций
+// Магазин
 // ---------------------------------------------------------------------------
+
+export type StorePackageType = "integration" | "widget";
 
 export type IntegrationCategory =
   | "protocol"
@@ -238,6 +293,7 @@ export interface StoreItem {
   category: IntegrationCategory;
   version: string;
   author: string;
+  packageType: StorePackageType;
   status: StoreItemStatus;
   /** Заявленные протоколы для маршрутизации авто-обнаружения. */
   protocols: string[];

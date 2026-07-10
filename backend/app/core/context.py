@@ -9,6 +9,8 @@ import asyncio
 import logging
 from typing import Any, Awaitable, Callable
 
+from fastapi import APIRouter
+
 from app.core.models import Device, PlanLayout, Room, Widget
 from app.core.registry import DeviceRegistry
 from app.core.scan_protocol import DeviceScanProvider
@@ -50,6 +52,9 @@ class IntegrationContext:
 
     def register_scan_provider(self, provider: DeviceScanProvider) -> None:
         self._registry.register_scan_provider(self.domain, provider)
+
+    def register_router(self, router: APIRouter, *, prefix: str = "") -> None:
+        self._registry.register_integration_router(self.domain, router, prefix)
 
     # -- state push ----------------------------------------------------------
 
