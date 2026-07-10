@@ -1,5 +1,5 @@
 """Store API: catalog and install/update/uninstall of integrations."""
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from app.core import install_progress, storage
@@ -22,6 +22,11 @@ class DomainRequest(BaseModel):
 
 class CustomRepoRequest(BaseModel):
     url: str
+    ref: str | None = None
+
+
+class LocalPathRequest(BaseModel):
+    path: str
 
 
 @router.get("", response_model=list[StoreItem])
@@ -72,7 +77,35 @@ async def uninstall(payload: DomainRequest) -> dict:
 @router.post("/custom-repo")
 async def add_custom_repo(payload: CustomRepoRequest) -> dict:
     try:
-        await store_client.add_custom_repo(payload.url)
+        await store_client.add_custom_repo(payload.url, payload.ref)
+    except IntegrationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"status": "ok"}
+
+
+@router.post("/install-local")
+async def install_local(payload: LocalPathRequest) -> dict:
+    path = payload.path.strip()
+    if not path:
+        raise HTTPException(status_code=400, detail="Укажите путь к папке пакета")
+    try:
+        await store_client.install(source=path)
+    except IntegrationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"status": "ok"}
+
+
+@router.post("/install-upload")
+async def install_upload(files: list[UploadFile] = File(...)) -> dict:
+    if not files:
+        raise HTTPException(status_code=400, detail="Выберите папку с пакетом")
+    payload: list[tuple[str, bytes]] = []
+    for upload in files:
+        name = (upload.filename or upload.file.name or "file").replace("\\", "/")
+        content = await upload.read()
+        payload.append((name, content))
+    try:
+        await store_client.install_from_upload(payload)
     except IntegrationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"status": "ok"}

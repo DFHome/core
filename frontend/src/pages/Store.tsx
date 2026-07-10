@@ -29,6 +29,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { StoreManualInstallDialogs } from "@/components/store/StoreManualInstallDialogs"
 
 const packageTypeLabel: Record<StorePackageType, string> = {
   integration: "Интеграция",
@@ -220,7 +221,7 @@ export default function Store() {
   const [busy, setBusy] = useState<string | null>(null)
   const [progress, setProgress] = useState<InstallProgress | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const { items, isLoading, install, update, uninstall } = useStore()
+  const { items, isLoading, refresh, install, update, uninstall } = useStore()
 
   const filtered = items.filter((item) => {
     const matchesQuery =
@@ -284,9 +285,12 @@ export default function Store() {
 
   return (
     <div className="space-y-4">
-      <p className="text-muted-foreground text-sm">
-        Каталог пакетов: интеграции устройств и виджеты дашборда из Git-репозиториев.
-      </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <p className="text-muted-foreground text-sm">
+          Каталог пакетов: интеграции устройств и виджеты дашборда из Git-репозиториев.
+        </p>
+        <StoreManualInstallDialogs onInstalled={refresh} />
+      </div>
       <Tabs
         value={tab}
         onValueChange={(value) => setSearchParams({ tab: value })}

@@ -1,9 +1,0 @@
-{
-  "packages": [
-    { "repository": "https://github.com/DFHome/integration-demo" },
-    { "repository": "https://github.com/DFHome/widget-metric" },
-    { "repository": "https://github.com/DFHome/widget-chart" },
-    { "repository": "https://github.com/DFHome/widget-weather" },
-    { "repository": "https://github.com/DFHome/widget-yandex-station" }
-  ]
-}

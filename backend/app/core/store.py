@@ -140,7 +140,11 @@ class StoreClient:
                 by_source[source] = entry
             except IntegrationError:
                 _LOGGER.warning("Skipping invalid remote index entry: %s", entry)
-        return list(by_source.values())
+        entries = list(by_source.values())
+        for url in await storage.list_custom_repos():
+            if url not in by_source:
+                entries.append({"repository": url})
+        return entries
 
     def _bundled_source_dir(self, name: str) -> Path:
         return Path(settings.bundled_integrations_dir).resolve() / name
@@ -254,6 +258,25 @@ class StoreClient:
                 source=source,
             )
             domain_priority[domain] = prio
+
+        for record in await storage.list_installed():
+            domain = record["domain"]
+            if domain in by_domain:
+                continue
+            manifest = record.get("manifest") or {}
+            by_domain[domain] = StoreItem(
+                domain=domain,
+                name=manifest.get("name", domain),
+                description=manifest.get("description", ""),
+                category=manifest.get("category", "service"),
+                version=record["version"],
+                author=manifest.get("author", "Community"),
+                package_type=manifest.get("package_type", "integration"),
+                status="installed",
+                protocols=manifest.get("protocols", []),
+                latest_version=None,
+                source=record.get("source"),
+            )
 
         items = list(by_domain.values())
         items.sort(key=lambda item: item.name.lower())
@@ -514,6 +537,81 @@ class StoreClient:
             else:
                 await storage.kv_delete("widgets_layout")
 
-    async def add_custom_repo(self, url: str) -> None:
+    def _find_upload_package_root(self, upload_root: Path) -> Path:
+        candidates: list[Path] = []
+        for manifest in upload_root.rglob("manifest.json"):
+            package_dir = manifest.parent
+            if (package_dir / "__init__.py").exists():
+                candidates.append(package_dir)
+        if not candidates:
+            raise IntegrationError(
+                "В загрузке нет пакета с manifest.json и __init__.py в одной папке"
+            )
+        return min(candidates, key=lambda path: len(path.parts))
+
+    async def install_from_upload(self, relative_files: list[tuple[str, bytes]]) -> None:
+        """Install a package uploaded from the browser (folder picker)."""
+        if not relative_files:
+            raise IntegrationError("Пустая загрузка")
+
+        progress_key = "__pending__"
+        await install_progress.clear(progress_key)
+        try:
+            await install_progress.set_progress(progress_key, "Подготовка…", 5)
+            with tempfile.TemporaryDirectory() as tmp:
+                upload_root = Path(tmp) / "upload"
+                upload_root.mkdir()
+                for rel_path, content in relative_files:
+                    rel = Path(rel_path)
+                    if rel.is_absolute() or ".." in rel.parts:
+                        raise IntegrationError(f"Недопустимый путь в загрузке: {rel_path}")
+                    dest = upload_root / rel
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    dest.write_bytes(content)
+
+                package_root = self._find_upload_package_root(upload_root)
+                staging = Path(tmp) / "pkg"
+                shutil.copytree(package_root, staging)
+
+                await install_progress.set_progress(
+                    progress_key, "Проверка пакета…", 45
+                )
+                manifest = self._load_manifest(staging)
+                resolved_domain = manifest["domain"]
+                if progress_key != resolved_domain:
+                    await install_progress.clear(progress_key)
+                    progress_key = resolved_domain
+
+                target = self._manager.integrations_dir / resolved_domain
+                if target.exists():
+                    raise IntegrationError(f"'{resolved_domain}' already installed")
+
+                await install_progress.set_progress(
+                    progress_key, "Установка зависимостей…", 65
+                )
+                await self._install_requirements(manifest)
+                await install_progress.set_progress(
+                    progress_key, "Копирование файлов…", 85
+                )
+                shutil.copytree(staging, target)
+
+            source = f"upload:{resolved_domain}"
+            await storage.upsert_installed(
+                domain=resolved_domain,
+                version=manifest["version"],
+                source=source,
+                pinned_ref=None,
+                manifest=manifest,
+            )
+            await install_progress.set_progress(
+                progress_key, "Загрузка интеграции…", 95
+            )
+            await self._manager.load(resolved_domain)
+            await install_progress.complete(progress_key)
+        except Exception:
+            await install_progress.fail(progress_key)
+            raise
+
+    async def add_custom_repo(self, url: str, ref: str | None = None) -> None:
         await storage.add_custom_repo(url)
-        await self.install(source=url)
+        await self.install(source=url, ref=ref)

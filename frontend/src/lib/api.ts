@@ -122,11 +122,40 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ domain }),
     }),
-  installFromUrl: (url: string) =>
+  installFromUrl: (url: string, ref?: string) =>
     request<{ status: string }>("/store/custom-repo", {
       method: "POST",
-      body: JSON.stringify({ url }),
+      body: JSON.stringify({ url, ref: ref || undefined }),
     }),
+  installFromLocalPath: (path: string) =>
+    request<{ status: string }>("/store/install-local", {
+      method: "POST",
+      body: JSON.stringify({ path }),
+    }),
+  installFromUpload: async (files: File[]) => {
+    const formData = new FormData();
+    for (const file of files) {
+      const relativePath =
+        (file as File & { webkitRelativePath?: string }).webkitRelativePath ||
+        file.name;
+      formData.append("files", file, relativePath);
+    }
+    const response = await fetch(`${BASE}/store/install-upload`, {
+      method: "POST",
+      body: formData,
+    });
+    if (!response.ok) {
+      let detail = response.statusText;
+      try {
+        const body = await response.json();
+        detail = body.detail ?? detail;
+      } catch {
+        // ignore non-JSON error bodies
+      }
+      throw new Error(detail);
+    }
+    return (await response.json()) as { status: string };
+  },
   update: (domain: string) =>
     request<{ status: string }>("/store/update", {
       method: "POST",

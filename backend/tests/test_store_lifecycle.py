@@ -94,3 +94,31 @@ async def test_catalog_marks_installed(core):
     catalog = await store.catalog()
     demo = next(item for item in catalog if item.domain == "demo")
     assert demo.status == "installed"
+
+
+async def test_install_from_absolute_path(core):
+    _, manager, store = core
+    demo_path = str(Path(settings.bundled_integrations_dir) / "demo")
+    await store.install(source=demo_path)
+    assert manager.is_loaded("demo")
+
+
+async def test_install_from_upload(core):
+    _, manager, store = core
+    demo_dir = Path(settings.bundled_integrations_dir) / "demo"
+    files: list[tuple[str, bytes]] = []
+    for path in demo_dir.rglob("*"):
+        if path.is_file():
+            rel = path.relative_to(demo_dir).as_posix()
+            files.append((rel, path.read_bytes()))
+    await store.install_from_upload(files)
+    assert manager.is_loaded("demo")
+    installed = await storage.get_installed("demo")
+    assert installed["source"] == "upload:demo"
+
+
+async def test_catalog_lists_custom_repos(core):
+    _, _, store = core
+    await storage.add_custom_repo("local:demo")
+    catalog = await store.catalog()
+    assert any(item.domain == "demo" for item in catalog)
