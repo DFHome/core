@@ -218,7 +218,7 @@ export function StoreManualInstallDialogs({
               для машины, где работает ядро DFHome.
             </DialogDescription>
           </DialogHeader>
-          <Tabs defaultValue="upload">
+          <Tabs defaultValue="upload" className="mt-3">
             <TabsList className="w-full">
               <TabsTrigger value="upload">Выбрать папку</TabsTrigger>
               <TabsTrigger value="path">Путь на сервере</TabsTrigger>
