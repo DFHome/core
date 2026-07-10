@@ -1,5 +1,8 @@
+import type { MouseEvent } from "react"
 import { Boxes, LayoutDashboard, Home, Store, Settings, House } from "lucide-react"
-import { NavLink, useLocation } from "react-router-dom"
+import { useLocation } from "react-router-dom"
+
+import { useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard"
 
 import {
   Sidebar,
@@ -23,9 +26,18 @@ const nav = [
 
 export function AppSidebar() {
   const { pathname } = useLocation()
+  const { requestNavigation } = useUnsavedChangesGuard()
 
   const isActive = (to: string, end: boolean) =>
     end ? pathname === to : pathname === to || pathname.startsWith(`${to}/`)
+
+  const handleNav = (to: string) => (event: MouseEvent) => {
+    event.preventDefault()
+    if (to === pathname) {
+      return
+    }
+    requestNavigation(to)
+  }
 
   return (
     <Sidebar>
@@ -48,9 +60,9 @@ export function AppSidebar() {
               {nav.map((item) => (
                 <SidebarMenuItem key={item.to}>
                   <SidebarMenuButton
-                    render={<NavLink to={item.to} end={item.end} />}
                     isActive={isActive(item.to, item.end)}
                     tooltip={item.title}
+                    onClick={handleNav(item.to)}
                   >
                     <item.icon />
                     <span>{item.title}</span>

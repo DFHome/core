@@ -126,6 +126,13 @@ class DeviceRegistry:
         await self._event_bus.publish_device_state(device)
         await self._ws_manager.broadcast(WsMessage(type="device_state", device=device))
 
+    async def clear_devices_room_assignment(self, room_id: str) -> None:
+        """Detach devices from a room (e.g. when the room is removed from the plan)."""
+        for devices in self._devices.values():
+            for device in devices.values():
+                if device.room_id == room_id:
+                    await self.push_state(device.model_copy(update={"room_id": None}))
+
     # -- cleanup (clean unload / uninstall) ----------------------------------
 
     def clear_domain(self, domain: str) -> None:

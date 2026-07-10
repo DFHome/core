@@ -5,6 +5,7 @@ import { Package } from "lucide-react";
 import { useDevices } from "@/hooks/use-devices";
 import { usePlanLayout } from "@/hooks/use-plan-layout";
 import { useRooms } from "@/hooks/use-rooms";
+import { useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard";
 import type { PlanDevicePosition, PlanRoom } from "@/lib/types";
 import { DevicePlanInspector } from "@/components/plan/DevicePlanInspector";
 import { PlanCanvas } from "@/components/plan/PlanCanvas";
@@ -37,8 +38,9 @@ function clampDevice(position: PlanDevicePosition): PlanDevicePosition {
 
 export default function Plan() {
   const { devices, updateCapability } = useDevices();
-  const { rooms, createRoom, updateRoom } = useRooms();
-  const { layout, setLayout, save, reset, isLoading } = usePlanLayout();
+  const { rooms, createRoom, updateRoom, refresh: refreshRooms } = useRooms();
+  const { layout, setLayout, save, reset, discardChanges, isLoading, isDirty } = usePlanLayout();
+  const { setGuard } = useUnsavedChangesGuard();
   const [editable, setEditable] = React.useState(false);
   const [selectedDeviceId, setSelectedDeviceId] = React.useState<string | null>(null);
   const selectedDevice = devices.find((device) => device.id === selectedDeviceId);
@@ -49,13 +51,46 @@ export default function Plan() {
   const isPlanEmpty = layout.rooms.length === 0 && layout.devices.length === 0;
   const hasSuggestedContent = rooms.length > 0 || devices.length > 0;
 
-  const availableRooms = rooms.filter(
-    (room) => !layout.rooms.some((planRoom) => planRoom.roomId === room.id),
-  );
   const availableDevices = devices.filter(
     (device) =>
       !layout.devices.some((position) => position.deviceId === device.id),
   );
+
+  const planRoomIds = React.useMemo(
+    () => new Set(layout.rooms.map((room) => room.roomId)),
+    [layout.rooms],
+  );
+  const visibleRooms = React.useMemo(
+    () => rooms.filter((room) => planRoomIds.has(room.id)),
+    [rooms, planRoomIds],
+  );
+
+  const handleSave = React.useCallback(async (): Promise<boolean> => {
+    try {
+      await save();
+      await refreshRooms();
+      toast.success("План сохранён");
+      return true;
+    } catch {
+      toast.error("Не удалось сохранить план");
+      return false;
+    }
+  }, [refreshRooms, save]);
+
+  const handleDiscard = React.useCallback(() => {
+    discardChanges();
+    void refreshRooms();
+    setSelectedDeviceId(null);
+  }, [discardChanges, refreshRooms]);
+
+  React.useEffect(() => {
+    if (!editable || !isDirty) {
+      setGuard(null);
+      return;
+    }
+    setGuard({ isDirty, save: handleSave, discard: handleDiscard });
+    return () => setGuard(null);
+  }, [editable, handleDiscard, handleSave, isDirty, setGuard]);
 
   const updatePlanRoom = (updated: PlanRoom) => {
     setLayout((current) => ({
@@ -96,7 +131,9 @@ export default function Plan() {
 
   const handleCreateRoom = async () => {
     try {
-      const created = await createRoom({ name: `Комната ${rooms.length + 1}` });
+      const created = await createRoom({
+        name: `Комната ${layout.rooms.length + 1}`,
+      });
       addRoom(created.id);
     } catch {
       toast.error("Не удалось создать комнату");
@@ -164,18 +201,10 @@ export default function Plan() {
     setSelectedDeviceId(deviceId);
   };
 
-  const handleSave = async () => {
-    try {
-      await save();
-      toast.success("План сохранён");
-    } catch {
-      toast.error("Не удалось сохранить план");
-    }
-  };
-
   const handleReset = async () => {
     try {
       await reset();
+      await refreshRooms();
       setSelectedDeviceId(null);
       toast.info(
         hasSuggestedContent
@@ -218,10 +247,8 @@ export default function Plan() {
         </p>
         <PlanToolbar
           editable={editable}
-          availableRooms={availableRooms}
           availableDevices={availableDevices}
           onEditableChange={setEditable}
-          onAddRoom={addRoom}
           onCreateRoom={() => void handleCreateRoom()}
           onAddDevice={addDevice}
           onSave={() => void handleSave()}
@@ -231,7 +258,7 @@ export default function Plan() {
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
         <PlanCanvas
-          rooms={rooms}
+          rooms={visibleRooms}
           devices={devices}
           layout={layout}
           editable={editable}
@@ -247,7 +274,7 @@ export default function Plan() {
         <DevicePlanInspector
           device={selectedDevice}
           position={selectedPosition}
-          rooms={rooms}
+          rooms={visibleRooms}
           planRooms={layout.rooms}
           onChange={updateDevice}
           onCapabilityChange={updateCapability}

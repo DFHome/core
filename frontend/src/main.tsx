@@ -6,13 +6,16 @@ import "./index.css"
 import App from "./App.tsx"
 import { ThemeProvider } from "@/components/theme-provider.tsx"
 import { DevicesProvider } from "@/hooks/use-devices.tsx"
+import { UnsavedChangesProvider } from "@/hooks/use-unsaved-changes-guard.tsx"
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ThemeProvider>
       <BrowserRouter>
         <DevicesProvider>
-          <App />
+          <UnsavedChangesProvider>
+            <App />
+          </UnsavedChangesProvider>
         </DevicesProvider>
       </BrowserRouter>
     </ThemeProvider>

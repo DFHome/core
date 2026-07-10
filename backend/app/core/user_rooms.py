@@ -75,11 +75,14 @@ async def scrub_room_from_plan(room_id: str) -> None:
     )
 
 
-async def delete_user_room(registry: DeviceRegistry, room_id: str) -> None:
+async def delete_user_room(
+    registry: DeviceRegistry, room_id: str, *, scrub_plan: bool = True
+) -> None:
     if not is_user_room(room_id):
         raise PermissionError("Only core-owned rooms can be deleted")
     deleted = await storage.delete_user_room(room_id)
     if not deleted:
         raise LookupError(f"Room '{room_id}' not found")
     registry.unregister_room(CORE_DOMAIN, room_id)
-    await scrub_room_from_plan(room_id)
+    if scrub_plan:
+        await scrub_room_from_plan(room_id)
